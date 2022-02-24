@@ -48,7 +48,7 @@ async def demagnetize(
                 )
         tg.cancel_scope.cancel()
     torrent = Torrent()
-    torrent.metadata.update(md)
+    torrent.metadata["info"] = md
     torrent.trackers = magnet.tr
     return torrent
 
@@ -69,10 +69,9 @@ async def get_peers_from_tracker(
                 sender.send(p)
         except Error as e:
             log.warning(
-                "Error getting peers for %s from tracker at %s: %s: %s",
+                "Error getting peers for %s from tracker at %s: %s",
                 info_hash,
                 url,
-                type(e).__name__,
                 e,
             )
 
@@ -101,9 +100,8 @@ async def get_metadata_from_peer(
             sender.send(md)
         except Error as e:
             log.warning(
-                "Error getting metadata for %s from peer %s: %s: %s",
+                "Error getting metadata for %s from peer %s: %s",
                 info_hash,
                 peer,
-                type(e).__name__,
                 e,
             )
