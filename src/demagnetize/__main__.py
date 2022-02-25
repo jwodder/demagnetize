@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional, TextIO, Tuple
+from typing import Optional, TextIO
 import anyio
 import click
 from click_loglevel import LogLevel
@@ -42,10 +42,8 @@ def main(log_level: int) -> None:
 def get(ctx: click.Context, magnet: Magnet, outfile: str) -> None:
     """Convert a magnet URL to a .torrent file"""
     demagnetizer = Demagnetizer()
-    output: List[Tuple[Magnet, Optional[str]]] = []
-    anyio.run(demagnetizer.demagnetize2file, magnet, outfile, output)
-    downloaded = sum(1 for _, fname in output if fname is not None)
-    if not downloaded or downloaded < len(output):
+    r = anyio.run(demagnetizer.demagnetize2file, magnet, outfile)
+    if not r.ok:
         ctx.exit(1)
 
 
@@ -62,11 +60,10 @@ def batch(ctx: click.Context, magnetfile: TextIO, outfile: str) -> None:
         return
     demagnetizer = Demagnetizer()
     r = anyio.run(demagnetizer.download_torrents, magnets, outfile)
-    downloaded = sum(1 for _, fname in r if fname is not None)
     log.info(
-        "%d/%d magnet URLs successfully converted to torrent files", downloaded, len(r)
+        "%d/%d magnet URLs successfully converted to torrent files", r.finished, r.total
     )
-    if not downloaded or downloaded < len(r):
+    if not r.ok:
         ctx.exit(1)
 
 

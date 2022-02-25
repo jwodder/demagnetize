@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
+from functools import partial
 from random import randint
-from typing import List, Optional, Tuple, Union
+from typing import Awaitable, Callable, List, Union
 from anyio import EndOfStream, create_memory_object_stream, create_task_group
 from anyio.abc import TaskGroup
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
@@ -8,7 +9,14 @@ from torf import Magnet, Torrent
 from .errors import DemagnetizeFailure, Error
 from .peers import Peer
 from .trackers import Tracker
-from .util import InfoHash, log, make_peer_id, template_torrent_filename
+from .util import (
+    InfoHash,
+    Report,
+    acollect,
+    log,
+    make_peer_id,
+    template_torrent_filename,
+)
 
 
 @dataclass
@@ -20,22 +28,24 @@ class Demagnetizer:
         self,
         magnets: List[Union[str, Magnet]],
         outfile_pattern: str,
-    ) -> List[Tuple[Magnet, Optional[str]]]:
-        output: List[Tuple[Magnet, Optional[str]]] = []
-        async with create_task_group() as tg:
-            for m in magnets:
+    ) -> Report:
+        funcs: List[Callable[[], Awaitable[Report]]] = []
+        for m in magnets:
+            if not isinstance(m, Magnet):
                 try:
-                    if not isinstance(m, Magnet):
-                        m = Magnet.from_string(m)
+                    m = Magnet.from_string(m)
                 except ValueError:
                     log.error("Invalid magnet URL: %s", m)
                     continue
-                tg.start_soon(self.demagnetize2file, m, outfile_pattern, output)
-        return output
+            funcs.append(partial(self.demagnetize2file, m, outfile_pattern))
+        report = Report()
+        if funcs:
+            async with acollect(funcs) as ait:
+                async for r in ait:
+                    report += r
+        return report
 
-    async def demagnetize2file(
-        self, magnet: Magnet, pattern: str, output: List[Tuple[Magnet, Optional[str]]]
-    ) -> None:
+    async def demagnetize2file(self, magnet: Magnet, pattern: str) -> Report:
         try:
             torrent = await self.demagnetize(magnet)
             filename = template_torrent_filename(pattern, torrent)
@@ -46,9 +56,9 @@ class Demagnetizer:
             torrent.write(filename)
         except DemagnetizeFailure as e:
             log.error("%s", e)
-            output.append((magnet, None))
+            return Report.for_failure(magnet)
         else:
-            output.append((magnet, filename))
+            return Report.for_success(magnet, filename)
 
     async def demagnetize(self, magnet: Magnet) -> Torrent:
         # torf only accepts magnet URLs with valid info hashes, so this
