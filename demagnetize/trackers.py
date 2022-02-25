@@ -38,6 +38,7 @@ class HTTPTracker(Tracker):
                     raise TrackerError(
                         f"Request to tracker {self.url} returned {r.status_code}"
                     )
+                ### TODO: Should we send a "stopped" event to the tracker now?
             response = HTTPTrackerResponse.parse(r.content)
             return response.peers
         except HTTPError as e:
@@ -57,7 +58,3 @@ class HTTPTrackerResponse:
         ### Raise TrackerError if "failure reason" present
         ###   (Insert the tracker URL into the error at some spot)
         raise NotImplementedError
-
-
-def get_tracker(url: str) -> Tracker:
-    raise NotImplementedError

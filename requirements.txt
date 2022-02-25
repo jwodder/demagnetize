@@ -1,3 +1,4 @@
 anyio ~= 3.5
+click >= 7.0
 httpx ~= 0.22
 torf ~= 3.1
