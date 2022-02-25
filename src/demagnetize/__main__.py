@@ -1,10 +1,21 @@
 import logging
-from typing import TextIO
+from typing import Optional, TextIO
 import anyio
 import click
 from click_loglevel import LogLevel
 from .core import Demagnetizer
 from .util import log, yield_lines
+
+
+def validate_template(
+    _ctx: click.Context, _param: click.Parameter, value: Optional[str]
+) -> Optional[str]:
+    if value is not None:
+        try:
+            value.format(name="name", hash="hash")
+        except ValueError:
+            raise click.BadParameter(f"{value}: invalid filename template")
+    return value
 
 
 @click.command()
@@ -15,8 +26,7 @@ from .util import log, yield_lines
     default=logging.INFO,
     help="Set logging level  [default: INFO]",
 )
-@click.option("-o", "--outfile", default="{name}.torrent")
-### TODO: Validate that `outfile` is a valid placeholder string
+@click.option("-o", "--outfile", default="{name}.torrent", callback=validate_template)
 ### TODO: Add options for setting peer ID & port
 @click.option("magnetfile", type=click.File())
 @click.pass_context

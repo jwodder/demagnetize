@@ -24,7 +24,8 @@ class Peer:
         log.debug("Connecting to peer at %s", self)
         async with await connect_tcp(self.host, self.port) as conn:
             log.debug("Connected to peer at %s", self)
-            yield ConnectedPeer(conn)
+            async with ConnectedPeer(conn) as connpeer:
+                yield connpeer
 
     async def get_metadata(self, info_hash: InfoHash) -> dict:
         log.info("Requesting metadata for %s from peer %s", info_hash, self)
