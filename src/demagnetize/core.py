@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 import logging
 from random import randint
-from typing import Dict, List, Optional, Union
+from typing import List, Optional, Tuple, Union
 from anyio import EndOfStream, TaskGroup, create_memory_object_stream, create_task_group
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from torf import Magnet, Torrent
@@ -22,8 +22,8 @@ class Demagnetizer:
         self,
         magnets: List[Union[str, Magnet]],
         outfile_pattern: str,
-    ) -> Dict[Magnet, Optional[str]]:
-        output: Dict[Magnet, Optional[str]] = {}
+    ) -> List[Tuple[Magnet, Optional[str]]]:
+        output: List[Tuple[Magnet, Optional[str]]] = []
         async with create_task_group() as tg:
             for m in magnets:
                 try:
@@ -36,7 +36,7 @@ class Demagnetizer:
         return output
 
     async def demagnetize2file(
-        self, magnet: Magnet, pattern: str, output: Dict[Magnet, Optional[str]]
+        self, magnet: Magnet, pattern: str, output: List[Tuple[[Magnet, Optional[str]]]]
     ) -> None:
         try:
             torrent = await self.demagnetize(magnet)
@@ -48,9 +48,9 @@ class Demagnetizer:
             torrent.write(filename)
         except DemagnetizeFailure as e:
             log.error("%s", e)
-            output[magnet] = None
+            output.append(magnet, None)
         else:
-            output[magnet] = filename
+            output.append(magnet, filename)
 
     async def demagnetize(self, magnet: Magnet) -> Torrent:
         info_hash = InfoHash.from_string(magnet.infohash)
