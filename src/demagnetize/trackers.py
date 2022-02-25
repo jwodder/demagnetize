@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from ipaddress import AddressValueError, IPv4Address, IPv6Address
 import struct
-from typing import List, cast
+from typing import List, Optional, cast
 from flatbencode import decode
 from httpx import AsyncClient, HTTPError
 from .errors import TrackerError
@@ -84,8 +84,26 @@ class HTTPTracker(Tracker):
             peers: List[Peer] = []
             if isinstance(data[b"peers"], list):
                 # Original format (BEP 0003)
-                ### TODO
-                raise NotImplementedError
+                for p in data[b"peers"]:
+                    if not isinstance(p, dict):
+                        raise ValueError("invalid 'peers' list")
+                    try:
+                        ip = cast(bytes, p[b"ip"]).decode("utf-8")
+                    except Exception:
+                        raise ValueError("invalid 'peers' list")
+                    if b"port" in p and isinstance(p[b"port"], int):
+                        port = p[b"port"]
+                    else:
+                        raise ValueError("invalid 'peers' list")
+                    peer_id: Optional[str]
+                    if b"peer id" in p and isinstance(p[b"peer id"], bytes):
+                        try:
+                            peer_id = p[b"peer id"].decode("utf-8")
+                        except UnicodeDecodeError:
+                            raise ValueError("invalid 'peers' list")
+                    else:
+                        peer_id = None
+                    peers.append(Peer(host=ip, port=port, id=peer_id))
             elif isinstance(data[b"peers"], bytes):
                 # Compact format (BEP 0023)
                 try:
