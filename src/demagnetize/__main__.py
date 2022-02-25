@@ -19,7 +19,7 @@ def main(ctx: click.Context, magnetfile: TextIO, outfile: str) -> None:
         return
     demagnetizer = Demagnetizer()
     r = anyio.run(demagnetizer.download_torrents, magnets, outfile)
-    downloaded = sum(1 for fname in r.values() if fname is not None)
+    downloaded = sum(1 for _, fname in r if fname is not None)
     log.info(
         "%d/%d magnet URLs successfully converted to torrent files", downloaded, len(r)
     )

@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
 from random import randint
 from typing import List, Optional, Tuple, Union
-from anyio import EndOfStream, TaskGroup, create_memory_object_stream, create_task_group
+from anyio import EndOfStream, create_memory_object_stream, create_task_group
+from anyio.abc import TaskGroup
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from torf import Magnet, Torrent
 from .errors import DemagnetizeFailure, Error
@@ -33,7 +34,7 @@ class Demagnetizer:
         return output
 
     async def demagnetize2file(
-        self, magnet: Magnet, pattern: str, output: List[Tuple[[Magnet, Optional[str]]]]
+        self, magnet: Magnet, pattern: str, output: List[Tuple[Magnet, Optional[str]]]
     ) -> None:
         try:
             torrent = await self.demagnetize(magnet)
@@ -45,9 +46,9 @@ class Demagnetizer:
             torrent.write(filename)
         except DemagnetizeFailure as e:
             log.error("%s", e)
-            output.append(magnet, None)
+            output.append((magnet, None))
         else:
-            output.append(magnet, filename)
+            output.append((magnet, filename))
 
     async def demagnetize(self, magnet: Magnet) -> Torrent:
         # torf only accepts magnet URLs with valid info hashes, so this

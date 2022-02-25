@@ -28,7 +28,7 @@ class Peer:
 
     async def get_metadata(self, info_hash: InfoHash) -> dict:
         log.info("Requesting metadata for %s from peer %s", info_hash, self)
-        async with await self.connect() as connpeer:
+        async with self.connect() as connpeer:
             return await connpeer.get_metadata(info_hash)
 
 
