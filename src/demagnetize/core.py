@@ -50,8 +50,9 @@ class Demagnetizer:
             output.append(magnet, filename)
 
     async def demagnetize(self, magnet: Magnet) -> Torrent:
+        # torf only accepts magnet URLs with valid info hashes, so this
+        # shouldn't fail:
         info_hash = InfoHash.from_string(magnet.infohash)
-        ### ^^ TODO: Catch errors
         if not magnet.tr:
             raise DemagnetizeFailure(
                 f"Cannot fetch metadata for info hash {info_hash}: No trackers"
@@ -93,9 +94,7 @@ class Demagnetizer:
         async with sender:
             try:
                 tracker = self.get_tracker(url)
-                ### TODO: Move this log call inside `get_peers()`?
-                log.info("Requesting peers for %s from tracker at %s", info_hash, url)
-                peers = await tracker.get_peers(bytes(info_hash))
+                peers = await tracker.get_peers(info_hash)
                 for p in peers:
                     await sender.send(p)
             except Error as e:
@@ -127,9 +126,7 @@ class Demagnetizer:
     ) -> None:
         async with sender:
             try:
-                ### TODO: Move this log call inside `get_metadata()`?
-                log.info("Requesting metadata for %s from peer %s", info_hash, peer)
-                md = await peer.get_metadata(bytes(info_hash))
+                md = await peer.get_metadata(info_hash)
                 await sender.send(md)
             except Error as e:
                 log.warning(

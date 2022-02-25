@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import AsyncIterator, Optional
 from anyio import connect_tcp
 from anyio.abc import AsyncResource, SocketStream
-from .util import log
+from .util import InfoHash, log
 
 
 @dataclass
@@ -23,9 +23,11 @@ class Peer:
     async def connect(self) -> AsyncIterator[ConnectedPeer]:
         log.debug("Connecting to peer at %s", self)
         async with await connect_tcp(self.host, self.port) as conn:
+            log.debug("Connected to peer at %s", self)
             yield ConnectedPeer(conn)
 
-    async def get_metadata(self, info_hash: bytes) -> dict:
+    async def get_metadata(self, info_hash: InfoHash) -> dict:
+        log.info("Requesting metadata for %s from peer %s", info_hash, self)
         async with await self.connect() as connpeer:
             return await connpeer.get_metadata(info_hash)
 
@@ -37,5 +39,5 @@ class ConnectedPeer(AsyncResource):
     async def aclose(self) -> None:
         await self.conn.aclose()
 
-    async def get_metadata(self, info_hash: bytes) -> dict:
+    async def get_metadata(self, info_hash: InfoHash) -> dict:
         raise NotImplementedError

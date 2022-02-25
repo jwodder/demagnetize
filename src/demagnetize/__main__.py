@@ -23,7 +23,7 @@ def main(ctx: click.Context, magnetfile: TextIO, outfile: str) -> None:
     log.info(
         "%d/%d magnet URLs successfully converted to torrent files", downloaded, len(r)
     )
-    if downloaded < len(r):
+    if not downloaded or downloaded < len(r):
         ctx.exit(1)
 
 
