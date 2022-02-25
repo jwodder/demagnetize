@@ -57,7 +57,7 @@ class HTTPTracker(Tracker):
             List[Peer], response.get(b"peers", []) + response.get(b"peers6", [])
         )
         log.info("Tracker at %s returned %d peers", self.url, len(peers))
-        log.debug(
+        log.debug(  ### TODO: Make this message TRACE level?  Remove?
             "Tracker at %s returned peers: %s",
             self.url,
             ", ".join(map(str, peers)),
