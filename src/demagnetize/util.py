@@ -2,9 +2,12 @@ from __future__ import annotations
 from base64 import b32decode
 from binascii import unhexlify
 from dataclasses import dataclass
+import logging
 import re
 from typing import Iterable, Iterator
 from torf import Torrent
+
+log = logging.getLogger(__package__)
 
 
 @dataclass

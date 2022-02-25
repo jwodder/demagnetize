@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-import logging
 from random import randint
 from typing import List, Optional, Tuple, Union
 from anyio import EndOfStream, TaskGroup, create_memory_object_stream, create_task_group
@@ -8,9 +7,7 @@ from torf import Magnet, Torrent
 from .errors import DemagnetizeFailure, Error
 from .peers import Peer
 from .trackers import Tracker
-from .util import InfoHash, make_peer_id, template_torrent_filename
-
-log = logging.getLogger(__package__)
+from .util import InfoHash, log, make_peer_id, template_torrent_filename
 
 
 @dataclass
@@ -96,10 +93,11 @@ class Demagnetizer:
         async with sender:
             try:
                 tracker = self.get_tracker(url)
+                ### TODO: Move this log call inside `get_peers()`?
                 log.info("Requesting peers for %s from tracker at %s", info_hash, url)
                 peers = await tracker.get_peers(bytes(info_hash))
                 for p in peers:
-                    sender.send(p)
+                    await sender.send(p)
             except Error as e:
                 log.warning(
                     "Error getting peers for %s from tracker at %s: %s",
@@ -129,10 +127,10 @@ class Demagnetizer:
     ) -> None:
         async with sender:
             try:
+                ### TODO: Move this log call inside `get_metadata()`?
                 log.info("Requesting metadata for %s from peer %s", info_hash, peer)
-                async with await peer.connect() as connpeer:
-                    md = await connpeer.get_metadata(bytes(info_hash))
-                sender.send(md)
+                md = await peer.get_metadata(bytes(info_hash))
+                await sender.send(md)
             except Error as e:
                 log.warning(
                     "Error getting metadata for %s from peer %s: %s",

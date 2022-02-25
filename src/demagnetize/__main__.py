@@ -1,8 +1,8 @@
 from typing import TextIO
 import anyio
 import click
-from .core import Demagnetizer, log
-from .util import yield_lines
+from .core import Demagnetizer
+from .util import log, yield_lines
 
 
 @click.command()

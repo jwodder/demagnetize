@@ -5,6 +5,7 @@ from typing import List
 from httpx import AsyncClient, HTTPError
 from .error import TrackerError
 from .peers import Peer
+from .util import log
 
 
 class Tracker(ABC):
@@ -32,6 +33,7 @@ class HTTPTracker(Tracker):
                         "downloaded": 0,
                         "left": 65535,  ### TODO: Look into
                         "event": "started",
+                        "compact": 1,
                     },
                 )
                 if not r.ok:
@@ -40,6 +42,11 @@ class HTTPTracker(Tracker):
                     )
                 ### TODO: Should we send a "stopped" event to the tracker now?
             response = HTTPTrackerResponse.parse(r.content)
+            log.debug(
+                "Tracker at %s returned peers: %s",
+                self.url,
+                ", ".join(map(str, response.peers)),
+            )
             return response.peers
         except HTTPError as e:
             raise TrackerError(
