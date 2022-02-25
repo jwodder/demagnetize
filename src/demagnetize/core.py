@@ -81,10 +81,7 @@ class Demagnetizer:
                         f"Could not fetch metadata for info hash {info_hash}"
                     )
             tg.cancel_scope.cancel()
-        torrent = Torrent()
-        torrent.metadata["info"] = md
-        torrent.trackers = magnet.tr
-        return torrent
+        return compose_torrent(magnet, md)
 
     async def get_peers_from_tracker(
         self,
@@ -139,3 +136,10 @@ class Demagnetizer:
 
     def get_tracker(self, url: str) -> Tracker:
         raise NotImplementedError
+
+
+def compose_torrent(magnet: Magnet, metadata: dict) -> Torrent:
+    torrent = Torrent()
+    torrent.metadata["info"] = metadata
+    torrent.trackers = magnet.tr
+    return torrent
