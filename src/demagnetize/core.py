@@ -156,6 +156,10 @@ class Demagnetizer:
             ### TODO: Should we check for other URL fields being nonempty?
             ### TODO: Some UDP URLs have a path of "/announce".  What does that
             ### mean?
+            if u.host is None:
+                raise TrackerError("URL missing host")
+            if u.port is None:
+                raise TrackerError("URL missing port")
             return UDPTracker(
                 host=u.host, port=u.port, peer_id=self.peer_id, peer_port=self.peer_port
             )

@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Optional, TextIO
 import anyio
@@ -5,7 +6,7 @@ import click
 from click_loglevel import LogLevel
 from torf import Magnet
 from .core import Demagnetizer
-from .util import TRACE, log, yield_lines
+from .util import TRACE, InfoHash, log, yield_lines
 
 
 def validate_template(
@@ -66,6 +67,17 @@ def batch(ctx: click.Context, magnetfile: TextIO, outfile: str) -> None:
     )
     if not r.ok:
         ctx.exit(1)
+
+
+@main.command()
+@click.argument("tracker")
+@click.argument("infohash", type=InfoHash.from_string)
+def get_peers(tracker: str, infohash: InfoHash) -> None:
+    demagnetizer = Demagnetizer()
+    tr = demagnetizer.get_tracker(tracker)
+    peers = anyio.run(tr.get_peers, infohash)
+    for p in peers:
+        print(json.dumps(p.for_json()))
 
 
 if __name__ == "__main__":
