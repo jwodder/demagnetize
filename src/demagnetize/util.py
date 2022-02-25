@@ -4,6 +4,7 @@ from binascii import unhexlify
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 import logging
+from random import randrange
 import re
 from typing import (
     AsyncIterator,
@@ -105,7 +106,7 @@ def sanitize_pathname(s: str) -> str:
 
 
 def make_peer_id() -> str:
-    raise NotImplementedError
+    return "-DM-0010-{:011}".format(randrange(10 ** 11))
 
 
 @asynccontextmanager
