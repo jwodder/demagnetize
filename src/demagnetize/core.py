@@ -6,9 +6,10 @@ from anyio import EndOfStream, create_memory_object_stream, create_task_group
 from anyio.abc import TaskGroup
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from torf import Magnet, Torrent
-from .errors import DemagnetizeFailure, Error
+from yarl import URL
+from .errors import DemagnetizeFailure, Error, TrackerError
 from .peers import Peer
-from .trackers import Tracker
+from .trackers import HTTPTracker, Tracker, UDPTracker
 from .util import (
     InfoHash,
     Report,
@@ -145,7 +146,21 @@ class Demagnetizer:
                 )
 
     def get_tracker(self, url: str) -> Tracker:
-        raise NotImplementedError
+        try:
+            u = URL(url)
+        except ValueError:
+            raise TrackerError("Invalid tracker URL")
+        if u.scheme in ("http", "https"):
+            return HTTPTracker(url=url, peer_id=self.peer_id, peer_port=self.peer_port)
+        elif u.scheme == "udp":
+            ### TODO: Should we check for other URL fields being nonempty?
+            ### TODO: Some UDP URLs have a path of "/announce".  What does that
+            ### mean?
+            return UDPTracker(
+                host=u.host, port=u.port, peer_id=self.peer_id, peer_port=self.peer_port
+            )
+        else:
+            raise TrackerError(f"Unsupported URL scheme {u.scheme!r}")
 
 
 def compose_torrent(magnet: Magnet, metadata: dict) -> Torrent:

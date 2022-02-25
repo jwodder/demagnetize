@@ -128,3 +128,14 @@ class HTTPTracker(Tracker):
                 raise ValueError("invalid 'peers' list")
             data[b"peers6"] = peers6
         return data
+
+
+@dataclass
+class UDPTracker(Tracker):
+    host: str
+    port: int
+    peer_id: str
+    peer_port: int
+
+    async def get_peers(self, info_hash: InfoHash) -> List[Peer]:
+        raise NotImplementedError
