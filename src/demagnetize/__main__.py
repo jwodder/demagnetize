@@ -5,7 +5,7 @@ import click
 from click_loglevel import LogLevel
 from torf import Magnet
 from .core import Demagnetizer
-from .util import log, yield_lines
+from .util import TRACE, log, yield_lines
 
 
 def validate_template(
@@ -23,7 +23,7 @@ def validate_template(
 @click.option(
     "-l",
     "--log-level",
-    type=LogLevel(),
+    type=LogLevel(extra={"TRACE": TRACE}),
     default=logging.INFO,
     help="Set logging level  [default: INFO]",
 )
@@ -33,6 +33,7 @@ def main(log_level: int) -> None:
         datefmt="%H:%M:%S",
         level=log_level,
     )
+    logging.addLevelName(TRACE, "TRACE")
 
 
 @main.command()

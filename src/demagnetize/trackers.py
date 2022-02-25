@@ -8,7 +8,7 @@ from flatbencode import decode
 from httpx import AsyncClient, HTTPError
 from .errors import TrackerError
 from .peers import Peer
-from .util import InfoHash, log
+from .util import TRACE, InfoHash, log
 
 
 class Tracker(ABC):
@@ -49,6 +49,7 @@ class HTTPTracker(Tracker):
             raise TrackerError(
                 f"Error communicating with tracker {self.url}: {type(e).__name__}: {e}"
             )
+        log.log(TRACE, "Tracker at %s replied with: %r", self.url, r.content)
         try:
             response = self.parse_response(r.content)
         except ValueError as e:

@@ -22,6 +22,8 @@ from torf import Magnet, Torrent
 
 log = logging.getLogger(__package__)
 
+TRACE = 5
+
 T = TypeVar("T")
 
 
