@@ -4,8 +4,10 @@ from dataclasses import dataclass
 from ipaddress import AddressValueError, IPv4Address, IPv6Address
 import struct
 from typing import List, Optional, cast
+from urllib.parse import quote
 from flatbencode import decode
 from httpx import AsyncClient, HTTPError
+from yarl import URL
 from .errors import TrackerError
 from .peers import Peer
 from .util import TRACE, InfoHash, log
@@ -19,27 +21,32 @@ class Tracker(ABC):
 
 @dataclass
 class HTTPTracker(Tracker):
-    url: str
+    url: URL
     peer_id: str
     peer_port: int
 
     async def get_peers(self, info_hash: InfoHash) -> List[Peer]:
         log.info("Requesting peers for %s from tracker at %s", info_hash, self.url)
+        # As of v0.22.0, the only way to send a bytes query parameter through
+        # httpx is if we do all of the encoding ourselves.
+        params = (
+            f"info_hash={quote(bytes(info_hash))}"
+            f"&peer_id={quote(self.peer_id)}"
+            f"&port={self.peer_port}"
+            "&uploaded=0"
+            "&downloaded=0"
+            "&left=65535"  ### TODO: Look into
+            "&event=started"
+            "&compact=1"
+        )
+        url = self.url.with_fragment(None)
+        if url.query_string:
+            target = f"{url}&{params}"
+        else:
+            target = f"{url}?{params}"
         try:
             async with AsyncClient(follow_redirects=True) as client:
-                r = await client.get(
-                    self.url,
-                    params={
-                        "info_hash": bytes(info_hash),
-                        "peer_id": self.peer_id,
-                        "port": self.peer_port,
-                        "uploaded": 0,
-                        "downloaded": 0,
-                        "left": 65535,  ### TODO: Look into
-                        "event": "started",
-                        "compact": 1,
-                    },
-                )
+                r = await client.get(target)
                 if r.is_error:
                     raise TrackerError(
                         f"Request to tracker {self.url} returned {r.status_code}"

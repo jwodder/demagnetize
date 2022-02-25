@@ -151,7 +151,7 @@ class Demagnetizer:
         except ValueError:
             raise TrackerError("Invalid tracker URL")
         if u.scheme in ("http", "https"):
-            return HTTPTracker(url=url, peer_id=self.peer_id, peer_port=self.peer_port)
+            return HTTPTracker(url=u, peer_id=self.peer_id, peer_port=self.peer_port)
         elif u.scheme == "udp":
             ### TODO: Should we check for other URL fields being nonempty?
             ### TODO: Some UDP URLs have a path of "/announce".  What does that
