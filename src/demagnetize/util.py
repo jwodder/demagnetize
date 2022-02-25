@@ -1,7 +1,7 @@
 from __future__ import annotations
-from dataclasses import dataclass
-from binascii import unhexlify
 from base64 import b32decode
+from binascii import unhexlify
+from dataclasses import dataclass
 import re
 from typing import Iterable, Iterator
 from torf import Torrent

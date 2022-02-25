@@ -1,14 +1,14 @@
 from dataclasses import dataclass, field
 import logging
 from random import randint
-from typing import List, Union
-from anyio import create_task_group, create_memory_object_stream, EndOfStream, TaskGroup
+from typing import Dict, List, Optional, Union
+from anyio import EndOfStream, TaskGroup, create_memory_object_stream, create_task_group
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from torf import Magnet, Torrent
 from .errors import DemagnetizeFailure, Error
 from .peers import Peer
 from .trackers import Tracker
-from .util import InfoHash, make_peer_id
+from .util import InfoHash, make_peer_id, template_torrent_filename
 
 log = logging.getLogger(__package__)
 
@@ -28,18 +28,22 @@ class Demagnetizer:
             for m in magnets:
                 try:
                     if not isinstance(m, Magnet):
-                        m = Magnet.from_string(magnet)
+                        m = Magnet.from_string(m)
                 except ValueError:
                     log.error("Invalid magnet URL: %s", m)
                     continue
                 tg.start_soon(self.demagnetize2file, m, outfile_pattern, output)
         return output
 
-    async def demagnetize2file(self, magnet: Magnet, pattern: str, output: Dict[Magnet, Optional[str]]) -> None:
+    async def demagnetize2file(
+        self, magnet: Magnet, pattern: str, output: Dict[Magnet, Optional[str]]
+    ) -> None:
         try:
             torrent = await self.demagnetize(magnet)
             filename = template_torrent_filename(pattern, torrent)
-            log.info("Saving torrent for info hash %s to file %s", magnet.infohash, filename)
+            log.info(
+                "Saving torrent for info hash %s to file %s", magnet.infohash, filename
+            )
             ### TODO: Catch write errors?
             torrent.write(filename)
         except DemagnetizeFailure as e:
@@ -53,7 +57,8 @@ class Demagnetizer:
         ### ^^ TODO: Catch errors
         if not magnet.tr:
             raise DemagnetizeFailure(
-                f"Cannot fetch metadata for info hash {info_hash}: No trackers in magnet URL"
+                f"Cannot fetch metadata for info hash {info_hash}: No trackers"
+                " in magnet URL"
             )
         async with create_task_group() as tg:
             peer_sender, peer_receiver = create_memory_object_stream()
@@ -136,5 +141,5 @@ class Demagnetizer:
                     e,
                 )
 
-    def get_tracker(url: str) -> Tracker:
+    def get_tracker(self, url: str) -> Tracker:
         raise NotImplementedError

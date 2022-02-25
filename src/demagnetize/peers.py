@@ -1,9 +1,9 @@
 from __future__ import annotations
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Optional, AsyncIterator
+from typing import AsyncIterator, Optional
 from anyio import connect_tcp
-from anyio.abc import SocketStream, AsyncResource
+from anyio.abc import AsyncResource, SocketStream
 
 
 @dataclass
