@@ -95,7 +95,7 @@ class Communicator(AsyncResource):
         else:
             ctx = fail_after(expiration - time())
         with ctx:
-            n = 1
+            n = 0
             while True:
                 log.log(TRACE, "Sending to tracker at %s: %r", self.tracker.url, msg)
                 await self.conn.send(msg)
@@ -229,7 +229,7 @@ def parse_announce_response(
     transaction_id: int, resp: bytes, is_ipv6: bool
 ) -> AnnounceResponse:
     header = struct.Struct("!iiiii")
-    action, xaction_id, interval, leechers, seeders = header.unpack(resp)
+    action, xaction_id, interval, leechers, seeders = header.unpack_from(resp)
     if xaction_id != transaction_id:
         raise ValueError(
             f"Transaction ID mismatch: expected {transaction_id}, got {xaction_id}"
