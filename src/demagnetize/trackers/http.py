@@ -1,28 +1,20 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from ipaddress import AddressValueError, IPv4Address, IPv6Address
-import struct
 from typing import List, Optional, cast
 from urllib.parse import quote
 from flatbencode import decode
 from httpx import AsyncClient, HTTPError
 from yarl import URL
-from .errors import TrackerError
-from .peers import Peer
-from .util import TRACE, InfoHash, log
-
-
-class Tracker(ABC):
-    @abstractmethod
-    async def get_peers(self, info_hash: InfoHash) -> List[Peer]:
-        ...
+from .base import Tracker, unpack_peers, unpack_peers6
+from ..errors import TrackerError
+from ..peers import Peer
+from ..util import TRACE, InfoHash, log
 
 
 @dataclass
 class HTTPTracker(Tracker):
     url: URL
-    peer_id: str
+    peer_id: bytes
     peer_port: int
 
     async def get_peers(self, info_hash: InfoHash) -> List[Peer]:
@@ -103,47 +95,21 @@ class HTTPTracker(Tracker):
                         port = p[b"port"]
                     else:
                         raise ValueError("invalid 'peers' list")
-                    peer_id: Optional[str]
+                    peer_id: Optional[bytes]
                     if b"peer id" in p and isinstance(p[b"peer id"], bytes):
-                        try:
-                            peer_id = p[b"peer id"].decode("utf-8")
-                        except UnicodeDecodeError:
-                            raise ValueError("invalid 'peers' list")
+                        peer_id = p[b"peer id"]
                     else:
                         peer_id = None
                     peers.append(Peer(host=ip, port=port, id=peer_id))
             elif isinstance(data[b"peers"], bytes):
                 # Compact format (BEP 0023)
-                try:
-                    for (ipnum, port) in struct.iter_unpack("!IH", data[b"peers"]):
-                        ip = str(IPv4Address(ipnum))
-                        peers.append(Peer(host=ip, port=port))
-                except (struct.error, AddressValueError):
-                    raise ValueError("invalid 'peers' list")
+                peers = unpack_peers(data[b"peers"])
             else:
                 raise ValueError("invalid 'peers' list")
             data[b"peers"] = peers
         if b"peers6" in data:
-            peers6: List[Peer] = []
             if not isinstance(data[b"peers6"], bytes):
                 raise ValueError("invalid 'peers6' list")
             # Compact format (BEP 0007)
-            try:
-                for (*ipnums, port) in struct.iter_unpack("!16cH", data[b"peers6"]):
-                    ip = str(IPv6Address(b"".join(ipnums)))
-                    peers6.append(Peer(host=ip, port=port))
-            except (struct.error, AddressValueError):
-                raise ValueError("invalid 'peers' list")
-            data[b"peers6"] = peers6
+            data[b"peers6"] = unpack_peers6(data[b"peers6"])
         return data
-
-
-@dataclass
-class UDPTracker(Tracker):
-    host: str
-    port: int
-    peer_id: str
-    peer_port: int
-
-    async def get_peers(self, info_hash: InfoHash) -> List[Peer]:
-        raise NotImplementedError

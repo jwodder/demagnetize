@@ -12,6 +12,7 @@ from .peers import Peer
 from .trackers import HTTPTracker, Tracker, UDPTracker
 from .util import (
     InfoHash,
+    Key,
     Report,
     acollect,
     log,
@@ -22,7 +23,7 @@ from .util import (
 
 @dataclass
 class Demagnetizer:
-    peer_id: str = field(default_factory=make_peer_id)
+    peer_id: bytes = field(default_factory=make_peer_id)
     peer_port: int = field(default_factory=lambda: randint(1025, 65535))
 
     async def download_torrents(
@@ -153,16 +154,15 @@ class Demagnetizer:
         if u.scheme in ("http", "https"):
             return HTTPTracker(url=u, peer_id=self.peer_id, peer_port=self.peer_port)
         elif u.scheme == "udp":
-            ### TODO: Should we check for other URL fields being nonempty?
-            ### TODO: Some UDP URLs have a path of "/announce".  What does that
-            ### mean?
-            if u.host is None:
-                raise TrackerError("URL missing host")
-            if u.port is None:
-                raise TrackerError("URL missing port")
-            return UDPTracker(
-                host=u.host, port=u.port, peer_id=self.peer_id, peer_port=self.peer_port
-            )
+            try:
+                return UDPTracker(
+                    url=u,
+                    peer_id=self.peer_id,
+                    peer_port=self.peer_port,
+                    key=Key.generate(),
+                )
+            except ValueError as e:
+                raise TrackerError(f"Invalid tracker URL: {e}")
         else:
             raise TrackerError(f"Unsupported URL scheme {u.scheme!r}")
 

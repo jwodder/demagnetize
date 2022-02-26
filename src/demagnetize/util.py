@@ -51,6 +51,24 @@ class InfoHash:
 
 
 @dataclass
+class Key:
+    value: int
+
+    @classmethod
+    def generate(cls) -> Key:
+        return cls(randrange(1 << 32))
+
+    def __int__(self) -> int:
+        return self.value
+
+    def __str__(self) -> str:
+        return f"{self.value:08x}"
+
+    def __bytes__(self) -> bytes:
+        return self.value.to_bytes(4, "big")
+
+
+@dataclass
 class Report:
     #: Collection of magnet URLs and the files their torrents were saved to
     #: (None if the demagnetization failed)
@@ -105,8 +123,8 @@ def sanitize_pathname(s: str) -> str:
     return re.sub(r'[\0\x5C/<>:|"?*%]', "_", re.sub(r"\s", " ", s))
 
 
-def make_peer_id() -> str:
-    return "-DM-0010-{:011}".format(randrange(10 ** 11))
+def make_peer_id() -> bytes:
+    return "-DM-0010-{:011}".format(randrange(10 ** 11)).encode("us-ascii")
 
 
 @asynccontextmanager

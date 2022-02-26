@@ -1,6 +1,6 @@
 from __future__ import annotations
 from contextlib import asynccontextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any, AsyncIterator, Dict, Optional
 from anyio import connect_tcp
 from anyio.abc import AsyncResource, SocketStream
@@ -11,7 +11,7 @@ from .util import InfoHash, log
 class Peer:
     host: str
     port: int
-    id: Optional[str] = None
+    id: Optional[bytes] = None
 
     def __str__(self) -> str:
         if ":" in self.host:
@@ -20,7 +20,12 @@ class Peer:
             return f"{self.host}:{self.port}"
 
     def for_json(self) -> Dict[str, Any]:
-        return asdict(self)
+        pid: Optional[str]
+        if self.id is not None:
+            pid = self.id.decode("utf-8", "replace")
+        else:
+            pid = None
+        return {"host": self.host, "port": self.port, "id": pid}
 
     @asynccontextmanager
     async def connect(self) -> AsyncIterator[ConnectedPeer]:
