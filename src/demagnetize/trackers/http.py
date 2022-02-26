@@ -6,7 +6,7 @@ from flatbencode import decode
 from httpx import AsyncClient, HTTPError
 from yarl import URL
 from .base import Tracker, unpack_peers, unpack_peers6
-from ..consts import LEFT
+from ..consts import LEFT, NUMWANT
 from ..errors import TrackerError
 from ..peers import Peer
 from ..util import TRACE, InfoHash, log
@@ -31,6 +31,7 @@ class HTTPTracker(Tracker):
             f"&left={LEFT}"
             "&event=started"
             "&compact=1"
+            f"&numwant={NUMWANT}"
         )
         url = self.url.with_fragment(None)
         if url.query_string:
