@@ -2,3 +2,5 @@
 # the magnet URL of
 LEFT = 65535
 # TODO: Look into appropriate values (For comparison, Transmission uses 2^63-1)
+
+PEER_ID_PREFIX = "-DM-0010-"

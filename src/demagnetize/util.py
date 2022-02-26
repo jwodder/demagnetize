@@ -4,8 +4,9 @@ from binascii import unhexlify
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 import logging
-from random import randrange
+from random import choices, randrange
 import re
+from string import ascii_letters, digits
 from typing import (
     AsyncIterator,
     Awaitable,
@@ -20,6 +21,7 @@ from typing import (
 from anyio import create_memory_object_stream, create_task_group
 from anyio.streams.memory import MemoryObjectSendStream
 from torf import Magnet, Torrent
+from .consts import PEER_ID_PREFIX
 
 log = logging.getLogger(__package__)
 
@@ -124,7 +126,10 @@ def sanitize_pathname(s: str) -> str:
 
 
 def make_peer_id() -> bytes:
-    return "-DM-0010-{:011}".format(randrange(10 ** 11)).encode("us-ascii")
+    s = PEER_ID_PREFIX.encode("utf-8")[:20]
+    if len(s) < 20:
+        s += "".join(choices(ascii_letters + digits, k=20 - len(s))).encode("us-ascii")
+    return s
 
 
 @asynccontextmanager
