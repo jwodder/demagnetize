@@ -6,6 +6,7 @@ from flatbencode import decode
 from httpx import AsyncClient, HTTPError
 from yarl import URL
 from .base import Tracker, unpack_peers, unpack_peers6
+from ..consts import LEFT
 from ..errors import TrackerError
 from ..peers import Peer
 from ..util import TRACE, InfoHash, log
@@ -27,7 +28,7 @@ class HTTPTracker(Tracker):
             f"&port={self.peer_port}"
             "&uploaded=0"
             "&downloaded=0"
-            "&left=65535"  ### TODO: Look into
+            f"&left={LEFT}"
             "&event=started"
             "&compact=1"
         )

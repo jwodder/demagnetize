@@ -12,6 +12,7 @@ from anyio import create_connected_udp_socket, fail_after
 from anyio.abc import AsyncResource, ConnectedUDPSocket, SocketAttribute
 from yarl import URL
 from .base import Tracker, unpack_peers, unpack_peers6
+from ..consts import LEFT
 from ..peers import Peer
 from ..util import TRACE, InfoHash, Key, log
 
@@ -210,15 +211,14 @@ def build_announce_request(
 ) -> bytes:
     downloaded = 0
     uploaded = 0
-    event = 2  ### TODO: Use 0 instead?
-    left = 65535  ### TODO: Look into
+    event = 2
     num_want = -1
     ip_address = b"\0\0\0\0"
     return (
         struct.pack("!qii", connection_id, 1, transaction_id)
         + bytes(info_hash)
         + (peer_id + b"\0" * 20)[:20]
-        + struct.pack("!qqqi", downloaded, left, uploaded, event)
+        + struct.pack("!qqqi", downloaded, LEFT, uploaded, event)
         + ip_address
         + bytes(key)
         + struct.pack("!iH", num_want, peer_port)
