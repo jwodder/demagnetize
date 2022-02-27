@@ -195,7 +195,9 @@ def build_connection_request(transaction_id: int) -> bytes:
 
 def parse_connection_response(transaction_id: int, resp: bytes) -> int:
     # Returns connection ID
-    action, xaction_id, connection_id = struct.unpack("!iiq", resp)
+    action, xaction_id, connection_id = struct.unpack_from("!iiq", resp)
+    # Use `struct.unpack_from()` instead of `unpack()` because "Clients ...
+    # should not assume packets to be of a certain size"
     if xaction_id != transaction_id:
         raise ValueError(
             f"Transaction ID mismatch: expected {transaction_id}, got {xaction_id}"
