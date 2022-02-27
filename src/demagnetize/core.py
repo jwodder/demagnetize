@@ -3,6 +3,7 @@ from random import randint
 from time import time
 from typing import Awaitable, Callable, List, Union
 import attr
+import click
 from torf import Magnet, Torrent
 from yarl import URL
 from .consts import CLIENT
@@ -59,13 +60,16 @@ class Demagnetizer:
             log.info(
                 "Saving torrent for info hash %s to file %s", magnet.infohash, filename
             )
-            ### TODO: Catch write errors?
-            torrent.write(filename)
         except DemagnetizeFailure as e:
             log.error("%s", e)
             return Report.for_failure(magnet)
-        else:
-            return Report.for_success(magnet, filename)
+        try:
+            with click.open_file(filename, "wb") as fp:
+                torrent.write_stream(fp)
+        except Exception as e:
+            log.error("Error writing to file: %s: %s", type(e).__name__, e)
+            return Report.for_failure(magnet)
+        return Report.for_success(magnet, filename)
 
     async def demagnetize(self, magnet: Magnet) -> Torrent:
         session = self.open_session(magnet)
