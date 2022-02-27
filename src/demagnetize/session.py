@@ -27,10 +27,14 @@ class TorrentSession:
     async def get_info(self) -> dict:
         if not self.magnet.tr:
             raise DemagnetizeFailure(
-                f"Cannot fetch info for info hash {self.info_hash}: No trackers in"
-                " magnet URL"
+                f"Cannot fetch info for info hash {self.info_hash}: No trackers"
+                " in magnet URL"
             )
-        ### TODO: Insert an INFO message here including the magnet dn
+        if self.magnet.dn is not None:
+            display = f" ({self.magnet.dn})"
+        else:
+            display = ""
+        log.info("Fetching info for info hash %s%s", self.info_hash, display)
         async with create_task_group() as tg:
             peer_sender, peer_receiver = create_memory_object_stream()
             async with peer_sender:
