@@ -13,7 +13,7 @@ import attr
 from .base import Tracker, unpack_peers, unpack_peers6
 from ..consts import LEFT, NUMWANT
 from ..errors import TrackerError
-from ..peers import Peer
+from ..peer import Peer
 from ..util import TRACE, InfoHash, Key, log
 
 T = TypeVar("T")

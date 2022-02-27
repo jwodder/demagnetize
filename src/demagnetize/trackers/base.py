@@ -5,7 +5,7 @@ import struct
 from typing import TYPE_CHECKING, List
 import attr
 from yarl import URL
-from ..peers import Peer
+from ..peer import Peer
 from ..util import InfoHash
 
 if TYPE_CHECKING:

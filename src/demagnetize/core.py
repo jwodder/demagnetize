@@ -8,7 +8,7 @@ from torf import Magnet, Torrent
 from yarl import URL
 from .consts import CLIENT
 from .errors import DemagnetizeFailure, TrackerError
-from .peers import Peer
+from .peer import Peer
 from .session import TorrentSession
 from .trackers import HTTPTracker, Tracker, UDPTracker
 from .util import (

@@ -6,7 +6,7 @@ from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStre
 import attr
 from torf import Magnet
 from .errors import DemagnetizeFailure, Error
-from .peers import Peer
+from .peer import Peer
 from .util import InfoHash, log
 
 if TYPE_CHECKING:

@@ -7,7 +7,7 @@ from httpx import AsyncClient, HTTPError
 from .base import Tracker, unpack_peers, unpack_peers6
 from ..consts import CLIENT, LEFT, NUMWANT
 from ..errors import TrackerError
-from ..peers import Peer
+from ..peer import Peer
 from ..util import TRACE, InfoHash, log
 
 T = TypeVar("T")
