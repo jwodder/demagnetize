@@ -1,6 +1,6 @@
 import pytest
 from demagnetize.peers import Peer
-from demagnetize.trackers import HTTPTracker
+from demagnetize.trackers.http import Response
 
 
 @pytest.mark.parametrize(
@@ -22,12 +22,12 @@ from demagnetize.trackers import HTTPTracker
             b"\xc9\x98\xa6\x00\x01\xb9\xba\xf9\t\x1a\xe1\x86\x13\xbc[\xce\x9bD"
             b'\xeb,G\xd9|.5\xfd\xf1\xd4\xf1\x1b"\x14I\xa4\xbe\xb0)\x1b\xedp'
             b"\xcb\xac\xf1\xe0.I\x84m\xc9\x98\xaf\x00\x01e",
-            {
-                b"complete": 47,
-                b"incomplete": 5,
-                b"interval": 1800,
-                b"min interval": 1800,
-                b"peers": [
+            Response(
+                complete=47,
+                incomplete=5,
+                interval=1800,
+                min_interval=1800,
+                peers=[
                     Peer("119.148.98.108", 29663),
                     Peer("216.180.67.44", 6881),
                     Peer("186.22.223.232", 3888),
@@ -79,20 +79,22 @@ from demagnetize.trackers import HTTPTracker
                     Peer("172.241.224.46", 18820),
                     Peer("109.201.152.175", 1),
                 ],
-            },
+            ),
         ),
         (
             b"d8:intervali1800e5:peers6:iiiipp6:peers618:iiiiiiiiiiiiiiiippe",
-            {
-                b"interval": 1800,
-                b"peers": [Peer("105.105.105.105", 28784)],
-                b"peers6": [Peer("6969:6969:6969:6969:6969:6969:6969:6969", 28784)],
-            },
+            Response(
+                interval=1800,
+                peers=[
+                    Peer("105.105.105.105", 28784),
+                    Peer("6969:6969:6969:6969:6969:6969:6969:6969", 28784),
+                ],
+            ),
         ),
     ],
 )
-def test_http_tracker_parse_response(blob: bytes, obj: dict) -> None:
-    assert HTTPTracker.parse_response(blob) == obj
+def test_parse_response(blob: bytes, obj: Response) -> None:
+    assert Response.parse(blob) == obj
 
 
 @pytest.mark.parametrize(
@@ -102,6 +104,6 @@ def test_http_tracker_parse_response(blob: bytes, obj: dict) -> None:
         b" intervali300e6:peers66:\x00\x00\x00\x00\x00\x0010:tracker id7:AniRenae",
     ],
 )
-def test_http_tracker_parse_response_error(blob: bytes) -> None:
+def test_parse_bad_response(blob: bytes) -> None:
     with pytest.raises(ValueError):
-        HTTPTracker.parse_response(blob)
+        Response.parse(blob)

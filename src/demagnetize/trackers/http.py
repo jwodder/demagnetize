@@ -1,6 +1,6 @@
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import List, Optional, cast
+from dataclasses import dataclass, field
+from typing import Any, List, Optional, Type, TypeVar, cast
 from urllib.parse import quote
 from flatbencode import decode
 from httpx import AsyncClient, HTTPError
@@ -10,6 +10,8 @@ from ..consts import CLIENT, LEFT, NUMWANT
 from ..errors import TrackerError
 from ..peers import Peer
 from ..util import TRACE, InfoHash, log
+
+T = TypeVar("T")
 
 
 @dataclass
@@ -55,33 +57,55 @@ class HTTPTracker(Tracker):
             )
         log.log(TRACE, "%s replied with: %r", self, r.content)
         try:
-            response = self.parse_response(r.content)
+            response = Response.parse(r.content)
         except ValueError as e:
             raise TrackerError(f"Bad response from {self}: {e}")
-        peers = cast(
-            List[Peer], response.get(b"peers", []) + response.get(b"peers6", [])
+        if response.failure_reason is not None:
+            raise TrackerError(f"Request to {self} failed: {response.failure_reason}")
+        if response.warning_message is not None:
+            log.info("%s replied with warning: %s", self, response.warning_message)
+        log.info("%s returned %d peers", self, len(response.peers))
+        log.log(
+            TRACE, "%s returned peers: %s", self, ", ".join(map(str, response.peers))
         )
-        log.info("%s returned %d peers", self, len(peers))
-        log.log(TRACE, "%s returned peers: %s", self, ", ".join(map(str, peers)))
-        return peers
+        return response.peers
 
-    @staticmethod
-    def parse_response(content: bytes) -> dict:
+
+@dataclass
+class Response:
+    failure_reason: Optional[str] = None
+    warning_message: Optional[str] = None
+    interval: Optional[int] = None
+    min_interval: Optional[int] = None
+    tracker_id: Optional[bytes] = None
+    complete: Optional[int] = None
+    incomplete: Optional[int] = None
+    peers: List[Peer] = field(default_factory=list)
+
+    @classmethod
+    def parse(cls, content: bytes) -> Response:
+        # Unknown fields and (most) fields of the wrong type are discarded
         try:
             data = decode(content)
         except ValueError:
             raise ValueError("invalid bencoded data")
         if not isinstance(data, dict):
             raise ValueError("invalid response")
-        if b"failure reason" in data:
-            breason = data[b"failure reason"]
-            if isinstance(breason, bytes):
-                reason = breason.decode("utf-8", "replace")
+        r = cls()
+        if (failure := data.get(b"failure reason")) is not None:
+            if isinstance(failure, bytes):
+                r.failure_reason = failure.decode("utf-8", "replace")
             else:
-                reason = "<UNDECODABLE>"
-            raise ValueError(f"tracker query failed: {reason}")
+                # Do our best to salvage the situation
+                r.failure_reason = str(failure)
+        if (warning := get_typed_value(data, b"warning message", bytes)) is not None:
+            r.warning_message = warning.decode("utf-8", "replace")
+        r.interval = get_typed_value(data, b"interval", int)
+        r.min_interval = get_typed_value(data, b"min interval", int)
+        r.tracker_id = get_typed_value(data, b"tracker id", bytes)
+        r.complete = get_typed_value(data, b"complete", int)
+        r.incomplete = get_typed_value(data, b"incomplete", int)
         if b"peers" in data:
-            peers: List[Peer] = []
             if isinstance(data[b"peers"], list):
                 # Original format (BEP 0003)
                 for p in data[b"peers"]:
@@ -100,16 +124,23 @@ class HTTPTracker(Tracker):
                         peer_id = p[b"peer id"]
                     else:
                         peer_id = None
-                    peers.append(Peer(host=ip, port=port, id=peer_id))
+                    r.peers.append(Peer(host=ip, port=port, id=peer_id))
             elif isinstance(data[b"peers"], bytes):
                 # Compact format (BEP 0023)
-                peers = unpack_peers(data[b"peers"])
+                r.peers.extend(unpack_peers(data[b"peers"]))
             else:
                 raise ValueError("invalid 'peers' list")
-            data[b"peers"] = peers
         if b"peers6" in data:
             if not isinstance(data[b"peers6"], bytes):
                 raise ValueError("invalid 'peers6' list")
             # Compact format (BEP 0007)
-            data[b"peers6"] = unpack_peers6(data[b"peers6"])
-        return data
+            r.peers.extend(unpack_peers6(data[b"peers6"]))
+        return r
+
+
+def get_typed_value(data: dict, key: Any, klass: Type[T]) -> Optional[T]:
+    value = data.get(key)
+    if isinstance(value, klass):
+        return value
+    else:
+        return None
