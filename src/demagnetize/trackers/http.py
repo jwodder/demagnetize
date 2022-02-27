@@ -49,7 +49,7 @@ class HTTPTracker(Tracker):
                 if r.is_error:
                     raise TrackerError(f"Request to {self} returned {r.status_code}")
                 ### TODO: Should we send a "stopped" event to the tracker now?
-        except HTTPError as e:
+        except (HTTPError, OSError) as e:
             raise TrackerError(
                 f"Error communicating with {self}: {type(e).__name__}: {e}"
             )

@@ -13,6 +13,7 @@ from anyio.abc import AsyncResource, ConnectedUDPSocket, SocketAttribute
 from yarl import URL
 from .base import Tracker, unpack_peers, unpack_peers6
 from ..consts import LEFT, NUMWANT
+from ..errors import TrackerError
 from ..peers import Peer
 from ..util import TRACE, InfoHash, Key, log
 
@@ -47,9 +48,14 @@ class UDPTracker(Tracker):
         return f"<Tracker {self.url}>"
 
     async def get_peers(self, info_hash: InfoHash) -> List[Peer]:
-        async with await create_connected_udp_socket(self.host, self.port) as conn:
-            async with Communicator(tracker=self, conn=conn) as cmm:
-                return await cmm.get_peers(info_hash)
+        try:
+            async with await create_connected_udp_socket(self.host, self.port) as conn:
+                async with Communicator(tracker=self, conn=conn) as cmm:
+                    return await cmm.get_peers(info_hash)
+        except OSError as e:
+            raise TrackerError(
+                f"Error communicating with {self}: {type(e).__name__}: {e}"
+            )
 
 
 @dataclass
