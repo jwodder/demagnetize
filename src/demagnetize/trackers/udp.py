@@ -10,7 +10,6 @@ from time import time
 from typing import Any, Callable, ContextManager, List, Optional, TypeVar
 from anyio import create_connected_udp_socket, fail_after
 from anyio.abc import AsyncResource, ConnectedUDPSocket, SocketAttribute
-from yarl import URL
 from .base import Tracker, unpack_peers, unpack_peers6
 from ..consts import LEFT, NUMWANT
 from ..errors import TrackerError
@@ -24,28 +23,18 @@ PROTOCOL_ID = 0x41727101980
 
 @dataclass
 class UDPTracker(Tracker):
-    url: URL
     host: str = field(init=False)
     port: int = field(init=False)
-    key: Key
-    peer_id: bytes
-    peer_port: int
 
     def __post_init__(self) -> None:
         if self.url.scheme != "udp":
             raise ValueError("URL scheme must be 'udp'")
-        ### TODO: Should we check for other URL fields being nonempty?
-        ### TODO: Some UDP URLs have a path of "/announce".  What does that
-        ### mean?
         if self.url.host is None:
             raise ValueError("URL missing host")
         if self.url.port is None:
             raise ValueError("URL missing port")
         self.host = self.url.host
         self.port = self.url.port
-
-    def __str__(self) -> str:
-        return f"<Tracker {self.url}>"
 
     async def get_peers(self, info_hash: InfoHash) -> List[Peer]:
         try:
@@ -160,9 +149,9 @@ class Connection:
             transaction_id=transaction_id,
             connection_id=self.id,
             info_hash=info_hash,
-            peer_id=self.communicator.tracker.peer_id,
-            peer_port=self.communicator.tracker.peer_port,
-            key=self.communicator.tracker.key,
+            peer_id=self.communicator.tracker.app.peer_id,
+            peer_port=self.communicator.tracker.app.peer_port,
+            key=self.communicator.tracker.app.key,
         )
         return await self.communicator.send_receive(
             msg,

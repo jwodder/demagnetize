@@ -1,12 +1,25 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from ipaddress import AddressValueError, IPv4Address, IPv6Address
 import struct
-from typing import List
+from typing import TYPE_CHECKING, List
+from yarl import URL
 from ..peers import Peer
 from ..util import InfoHash
 
+if TYPE_CHECKING:
+    from ..core import Demagnetizer
 
+
+@dataclass
 class Tracker(ABC):
+    app: Demagnetizer
+    url: URL
+
+    def __str__(self) -> str:
+        return f"<Tracker {self.url}>"
+
     @abstractmethod
     async def get_peers(self, info_hash: InfoHash) -> List[Peer]:
         ...

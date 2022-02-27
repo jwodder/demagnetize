@@ -4,7 +4,6 @@ from typing import Any, List, Optional, Type, TypeVar, cast
 from urllib.parse import quote
 from flatbencode import decode
 from httpx import AsyncClient, HTTPError
-from yarl import URL
 from .base import Tracker, unpack_peers, unpack_peers6
 from ..consts import CLIENT, LEFT, NUMWANT
 from ..errors import TrackerError
@@ -16,21 +15,14 @@ T = TypeVar("T")
 
 @dataclass
 class HTTPTracker(Tracker):
-    url: URL
-    peer_id: bytes
-    peer_port: int
-
-    def __str__(self) -> str:
-        return f"<Tracker {self.url}>"
-
     async def get_peers(self, info_hash: InfoHash) -> List[Peer]:
         log.info("Requesting peers for %s from %s", info_hash, self)
         # As of v0.22.0, the only way to send a bytes query parameter through
         # httpx is if we do all of the encoding ourselves.
         params = (
             f"info_hash={quote(bytes(info_hash))}"
-            f"&peer_id={quote(self.peer_id)}"
-            f"&port={self.peer_port}"
+            f"&peer_id={quote(self.app.peer_id)}"
+            f"&port={self.app.peer_port}"
             "&uploaded=0"
             "&downloaded=0"
             f"&left={LEFT}"

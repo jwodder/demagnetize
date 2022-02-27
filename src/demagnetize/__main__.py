@@ -61,7 +61,7 @@ def batch(ctx: click.Context, magnetfile: TextIO, outfile: str) -> None:
         log.info("No magnet URLs to fetch")
         return
     demagnetizer = Demagnetizer()
-    r = anyio.run(demagnetizer.download_torrents, magnets, outfile)
+    r = anyio.run(demagnetizer.download_torrent_info, magnets, outfile)
     log.info(
         "%d/%d magnet URLs successfully converted to torrent files", r.finished, r.total
     )
@@ -74,8 +74,7 @@ def batch(ctx: click.Context, magnetfile: TextIO, outfile: str) -> None:
 @click.argument("infohash", type=InfoHash.from_string)
 def get_peers(tracker: str, infohash: InfoHash) -> None:
     demagnetizer = Demagnetizer()
-    tr = demagnetizer.get_tracker(tracker)
-    peers = anyio.run(tr.get_peers, infohash)
+    peers = anyio.run(demagnetizer.get_peers, tracker, infohash)
     for p in peers:
         print(json.dumps(p.for_json()))
 

@@ -3,16 +3,15 @@ from functools import partial
 from random import randint
 from time import time
 from typing import Awaitable, Callable, List, Union
-from anyio import EndOfStream, create_memory_object_stream, create_task_group
-from anyio.abc import TaskGroup
-from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from torf import Magnet, Torrent
 from yarl import URL
 from .consts import CLIENT
-from .errors import DemagnetizeFailure, Error, TrackerError
+from .errors import DemagnetizeFailure, TrackerError
 from .peers import Peer
+from .session import TorrentSession
 from .trackers import HTTPTracker, Tracker, UDPTracker
 from .util import (
+    TRACE,
     InfoHash,
     Key,
     Report,
@@ -25,13 +24,17 @@ from .util import (
 
 @dataclass
 class Demagnetizer:
+    key: Key = field(default_factory=Key.generate)
     peer_id: bytes = field(default_factory=make_peer_id)
     peer_port: int = field(default_factory=lambda: randint(1025, 65535))
 
-    async def download_torrents(
-        self,
-        magnets: List[Union[str, Magnet]],
-        outfile_pattern: str,
+    def __post_init__(self) -> None:
+        log.log(TRACE, "Using key = %s", self.key)
+        log.log(TRACE, "Using peer ID = %r", self.peer_id)
+        log.log(TRACE, "Using peer port = %d", self.peer_port)
+
+    async def download_torrent_info(
+        self, magnets: List[Union[str, Magnet]], outfile_pattern: str
     ) -> Report:
         funcs: List[Callable[[], Awaitable[Report]]] = []
         for m in magnets:
@@ -65,86 +68,16 @@ class Demagnetizer:
             return Report.for_success(magnet, filename)
 
     async def demagnetize(self, magnet: Magnet) -> Torrent:
-        # torf only accepts magnet URLs with valid info hashes, so this
-        # shouldn't fail:
-        info_hash = InfoHash.from_string(magnet.infohash)
-        if not magnet.tr:
-            raise DemagnetizeFailure(
-                f"Cannot fetch info for info hash {info_hash}: No trackers in"
-                " magnet URL"
-            )
-        async with create_task_group() as tg:
-            peer_sender, peer_receiver = create_memory_object_stream()
-            async with peer_sender:
-                for tr_url in magnet.tr:
-                    tg.start_soon(
-                        self.get_peers_from_tracker,
-                        tr_url,
-                        info_hash,
-                        peer_sender.clone(),
-                    )
-            info_sender, info_receiver = create_memory_object_stream()
-            tg.start_soon(self.pipe_peers, info_hash, tg, peer_receiver, info_sender)
-            async with info_receiver:
-                try:
-                    md = await info_receiver.receive()
-                except EndOfStream:
-                    raise DemagnetizeFailure(
-                        f"Could not fetch info for info hash {info_hash}"
-                    )
-            tg.cancel_scope.cancel()
+        session = self.open_session(magnet)
+        md = await session.get_info()
         return compose_torrent(magnet, md)
 
-    async def get_peers_from_tracker(
-        self,
-        url: str,
-        info_hash: InfoHash,
-        sender: MemoryObjectSendStream[Peer],
-    ) -> None:
-        async with sender:
-            try:
-                tracker = self.get_tracker(url)
-                peers = await tracker.get_peers(info_hash)
-                for p in peers:
-                    await sender.send(p)
-            except Error as e:
-                log.warning(
-                    "Error getting peers for %s from tracker at %s: %s",
-                    info_hash,
-                    url,
-                    e,
-                )
+    async def get_peers(self, tracker_url: str, info_hash: InfoHash) -> List[Peer]:
+        tracker = self.get_tracker(tracker_url)
+        return await tracker.get_peers(info_hash)
 
-    async def pipe_peers(
-        self,
-        info_hash: InfoHash,
-        task_group: TaskGroup,
-        peer_receiver: MemoryObjectReceiveStream[Peer],
-        info_sender: MemoryObjectSendStream[dict],
-    ) -> None:
-        async with peer_receiver, info_sender:
-            async for peer in peer_receiver:
-                task_group.start_soon(
-                    self.get_info_from_peer,
-                    peer,
-                    info_hash,
-                    info_sender.clone(),
-                )
-
-    async def get_info_from_peer(
-        self, peer: Peer, info_hash: InfoHash, sender: MemoryObjectSendStream[dict]
-    ) -> None:
-        async with sender:
-            try:
-                md = await peer.get_info(info_hash)
-                await sender.send(md)
-            except Error as e:
-                log.warning(
-                    "Error getting info for %s from %s: %s",
-                    info_hash,
-                    peer,
-                    e,
-                )
+    def open_session(self, magnet: Magnet) -> TorrentSession:
+        return TorrentSession(app=self, magnet=magnet)
 
     def get_tracker(self, url: str) -> Tracker:
         try:
@@ -152,15 +85,10 @@ class Demagnetizer:
         except ValueError:
             raise TrackerError("Invalid tracker URL")
         if u.scheme in ("http", "https"):
-            return HTTPTracker(url=u, peer_id=self.peer_id, peer_port=self.peer_port)
+            return HTTPTracker(app=self, url=u)
         elif u.scheme == "udp":
             try:
-                return UDPTracker(
-                    url=u,
-                    peer_id=self.peer_id,
-                    peer_port=self.peer_port,
-                    key=Key.generate(),
-                )
+                return UDPTracker(app=self, url=u)
             except ValueError as e:
                 raise TrackerError(f"Invalid tracker URL: {e}")
         else:
