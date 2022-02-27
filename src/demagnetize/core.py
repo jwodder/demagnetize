@@ -1,12 +1,14 @@
 from dataclasses import dataclass, field
 from functools import partial
 from random import randint
+from time import time
 from typing import Awaitable, Callable, List, Union
 from anyio import EndOfStream, create_memory_object_stream, create_task_group
 from anyio.abc import TaskGroup
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from torf import Magnet, Torrent
 from yarl import URL
+from .consts import CLIENT
 from .errors import DemagnetizeFailure, Error, TrackerError
 from .peers import Peer
 from .trackers import HTTPTracker, Tracker, UDPTracker
@@ -171,4 +173,6 @@ def compose_torrent(magnet: Magnet, metadata: dict) -> Torrent:
     torrent = Torrent()
     torrent.metadata["info"] = metadata
     torrent.trackers = magnet.tr
+    torrent.created_by = CLIENT
+    torrent.creation_date = time()
     return torrent
