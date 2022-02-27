@@ -1,5 +1,5 @@
 import pytest
-from demagnetize.peers import Peer
+from demagnetize.peer import Peer
 from demagnetize.trackers.http import Response
 
 
