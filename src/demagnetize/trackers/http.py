@@ -28,6 +28,7 @@ class HTTPTracker(Tracker):
             "&event=started"
             "&compact=1"
             f"&numwant={NUMWANT}"
+            f"&key={quote(str(self.app.key))}"
         )
         url = self.url.with_fragment(None)
         if url.query_string:
