@@ -111,8 +111,6 @@ class Communicator(AsyncResource):
                     with fail_after(15 << n):
                         resp = await self.conn.receive()
                 except TimeoutError:
-                    if expiration is not None and time() >= expiration:
-                        raise
                     log.log(
                         TRACE,
                         "%s did not reply in time; resending message",
