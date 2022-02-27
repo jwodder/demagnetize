@@ -6,7 +6,7 @@ from random import randint
 from socket import AF_INET6
 import struct
 from time import time
-from typing import Any, Callable, ContextManager, List, Optional, TypeVar
+from typing import Any, Callable, ContextManager, List, Optional, TypeVar, Union
 from anyio import create_connected_udp_socket, fail_after
 from anyio.abc import AsyncResource, ConnectedUDPSocket, SocketAttribute
 import attr
@@ -83,7 +83,7 @@ class Communicator(AsyncResource):
     async def send_receive(
         self,
         msg: bytes,
-        response_parser: Callable[[bytes], T],
+        response_parser: Callable[[bytes], Union[T, ErrorResponse]],
         expiration: Optional[float] = None,
     ) -> T:
         ctx: ContextManager[Any]
@@ -123,6 +123,8 @@ class Communicator(AsyncResource):
                     )
                     continue
                 else:
+                    if isinstance(data, ErrorResponse):
+                        raise TrackerError(f"{self} replied with error: {data.message}")
                     return data
 
     async def connect(self) -> Connection:
@@ -165,6 +167,11 @@ class Connection:
 
 
 @attr.define
+class ErrorResponse:
+    message: str
+
+
+@attr.define
 class AnnounceResponse:
     interval: int
     leechers: int
@@ -180,7 +187,21 @@ def build_connection_request(transaction_id: int) -> bytes:
     return struct.pack("!qii", PROTOCOL_ID, 0, transaction_id)
 
 
-def parse_connection_response(transaction_id: int, resp: bytes) -> int:
+def get_error_response(resp: bytes) -> Optional[ErrorResponse]:
+    action, _ = struct.unpack_from("!ii", resp)
+    ### TODO: Should we ever care about checking the transaction ID?
+    if action == 3:
+        msg = resp[8:].decode("utf-8", "replace")
+        return ErrorResponse(msg)
+    else:
+        return None
+
+
+def parse_connection_response(
+    transaction_id: int, resp: bytes
+) -> Union[int, ErrorResponse]:
+    if (er := get_error_response(resp)) is not None:
+        return er
     # Returns connection ID
     action, xaction_id, connection_id = struct.unpack_from("!iiq", resp)
     # Use `struct.unpack_from()` instead of `unpack()` because "Clients ...
@@ -220,7 +241,9 @@ def build_announce_request(
 
 def parse_announce_response(
     transaction_id: int, resp: bytes, is_ipv6: bool
-) -> AnnounceResponse:
+) -> Union[AnnounceResponse, ErrorResponse]:
+    if (er := get_error_response(resp)) is not None:
+        return er
     header = struct.Struct("!iiiii")
     action, xaction_id, interval, leechers, seeders = header.unpack_from(resp)
     if xaction_id != transaction_id:
