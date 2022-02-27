@@ -1,13 +1,13 @@
 from __future__ import annotations
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from typing import Any, AsyncIterator, Dict, Optional
 from anyio import connect_tcp
 from anyio.abc import AsyncResource, SocketStream
+import attr
 from .util import InfoHash, log
 
 
-@dataclass
+@attr.define
 class Peer:
     host: str
     port: int
@@ -42,7 +42,7 @@ class Peer:
             return await connpeer.get_info(info_hash)
 
 
-@dataclass
+@attr.define
 class ConnectedPeer(AsyncResource):
     conn: SocketStream
 

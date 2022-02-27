@@ -2,7 +2,6 @@ from __future__ import annotations
 from base64 import b32decode
 from binascii import unhexlify
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
 import logging
 from random import choices, randrange
 import re
@@ -20,6 +19,7 @@ from typing import (
 )
 from anyio import create_memory_object_stream, create_task_group
 from anyio.streams.memory import MemoryObjectSendStream
+import attr
 from torf import Magnet, Torrent
 from .consts import PEER_ID_PREFIX
 
@@ -30,7 +30,7 @@ TRACE = 5
 T = TypeVar("T")
 
 
-@dataclass
+@attr.define
 class InfoHash:
     as_str: str
     as_bytes: bytes
@@ -52,7 +52,7 @@ class InfoHash:
         return self.as_bytes
 
 
-@dataclass
+@attr.define
 class Key:
     value: int
 
@@ -70,11 +70,11 @@ class Key:
         return self.value.to_bytes(4, "big")
 
 
-@dataclass
+@attr.define
 class Report:
     #: Collection of magnet URLs and the files their torrents were saved to
     #: (None if the demagnetization failed)
-    downloads: List[Tuple[Magnet, Optional[str]]] = field(default_factory=list)
+    downloads: List[Tuple[Magnet, Optional[str]]] = attr.Factory(list)
 
     @classmethod
     def for_success(cls, magnet: Magnet, filename: str) -> Report:

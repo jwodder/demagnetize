@@ -1,7 +1,7 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
 from typing import Any, List, Optional, Type, TypeVar, cast
 from urllib.parse import quote
+import attr
 from flatbencode import decode
 from httpx import AsyncClient, HTTPError
 from .base import Tracker, unpack_peers, unpack_peers6
@@ -13,7 +13,6 @@ from ..util import TRACE, InfoHash, log
 T = TypeVar("T")
 
 
-@dataclass
 class HTTPTracker(Tracker):
     async def get_peers(self, info_hash: InfoHash) -> List[Peer]:
         log.info("Requesting peers for %s from %s", info_hash, self)
@@ -63,7 +62,7 @@ class HTTPTracker(Tracker):
         return response.peers
 
 
-@dataclass
+@attr.define
 class Response:
     failure_reason: Optional[str] = None
     warning_message: Optional[str] = None
@@ -72,7 +71,7 @@ class Response:
     tracker_id: Optional[bytes] = None
     complete: Optional[int] = None
     incomplete: Optional[int] = None
-    peers: List[Peer] = field(default_factory=list)
+    peers: List[Peer] = attr.Factory(list)
 
     @classmethod
     def parse(cls, content: bytes) -> Response:

@@ -1,7 +1,6 @@
 # <https://www.bittorrent.org/beps/bep_0015.html>
 from __future__ import annotations
 from contextlib import nullcontext
-from dataclasses import dataclass, field
 from functools import partial
 from random import randint
 from socket import AF_INET6
@@ -10,6 +9,7 @@ from time import time
 from typing import Any, Callable, ContextManager, List, Optional, TypeVar
 from anyio import create_connected_udp_socket, fail_after
 from anyio.abc import AsyncResource, ConnectedUDPSocket, SocketAttribute
+import attr
 from .base import Tracker, unpack_peers, unpack_peers6
 from ..consts import LEFT, NUMWANT
 from ..errors import TrackerError
@@ -21,12 +21,12 @@ T = TypeVar("T")
 PROTOCOL_ID = 0x41727101980
 
 
-@dataclass
+@attr.define
 class UDPTracker(Tracker):
-    host: str = field(init=False)
-    port: int = field(init=False)
+    host: str = attr.field(init=False)
+    port: int = attr.field(init=False)
 
-    def __post_init__(self) -> None:
+    def __attrs_post_init__(self) -> None:
         if self.url.scheme != "udp":
             raise ValueError("URL scheme must be 'udp'")
         if self.url.host is None:
@@ -47,7 +47,7 @@ class UDPTracker(Tracker):
             )
 
 
-@dataclass
+@attr.define
 class Communicator(AsyncResource):
     tracker: UDPTracker
     conn: ConnectedUDPSocket
@@ -134,11 +134,11 @@ class Communicator(AsyncResource):
         return Connection(communicator=self, id=conn_id)
 
 
-@dataclass
+@attr.define
 class Connection:
     communicator: Communicator
     id: int
-    expiration: float = field(init=False)
+    expiration: float = attr.field(init=False)
 
     def __post_init__(self) -> None:
         self.expiration = time() + 60
@@ -164,7 +164,7 @@ class Connection:
         )
 
 
-@dataclass
+@attr.define
 class AnnounceResponse:
     interval: int
     leechers: int

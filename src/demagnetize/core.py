@@ -1,8 +1,8 @@
-from dataclasses import dataclass, field
 from functools import partial
 from random import randint
 from time import time
 from typing import Awaitable, Callable, List, Union
+import attr
 from torf import Magnet, Torrent
 from yarl import URL
 from .consts import CLIENT
@@ -22,11 +22,11 @@ from .util import (
 )
 
 
-@dataclass
+@attr.define
 class Demagnetizer:
-    key: Key = field(default_factory=Key.generate)
-    peer_id: bytes = field(default_factory=make_peer_id)
-    peer_port: int = field(default_factory=lambda: randint(1025, 65535))
+    key: Key = attr.Factory(Key.generate)
+    peer_id: bytes = attr.Factory(make_peer_id)
+    peer_port: int = attr.Factory(lambda: randint(1025, 65535))
 
     def __post_init__(self) -> None:
         log.log(TRACE, "Using key = %s", self.key)
@@ -88,7 +88,8 @@ class Demagnetizer:
             return HTTPTracker(app=self, url=u)
         elif u.scheme == "udp":
             try:
-                return UDPTracker(app=self, url=u)
+                # <https://github.com/python/mypy/issues/12259>
+                return UDPTracker(app=self, url=u)  # type: ignore[call-arg]
             except ValueError as e:
                 raise TrackerError(f"Invalid tracker URL: {e}")
         else:

@@ -1,9 +1,9 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from anyio import EndOfStream, create_memory_object_stream, create_task_group
 from anyio.abc import TaskGroup
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
+import attr
 from torf import Magnet
 from .errors import DemagnetizeFailure, Error
 from .peers import Peer
@@ -13,11 +13,11 @@ if TYPE_CHECKING:
     from .core import Demagnetizer
 
 
-@dataclass
+@attr.define
 class TorrentSession:
     app: Demagnetizer
     magnet: Magnet
-    info_hash: InfoHash = field(init=False)
+    info_hash: InfoHash = attr.field(init=False)
 
     def __post_init__(self) -> None:
         # torf only accepts magnet URLs with valid info hashes, so this
