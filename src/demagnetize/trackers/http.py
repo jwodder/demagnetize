@@ -6,7 +6,7 @@ from flatbencode import decode
 from httpx import AsyncClient, HTTPError
 from yarl import URL
 from .base import Tracker, unpack_peers, unpack_peers6
-from ..consts import LEFT, NUMWANT
+from ..consts import CLIENT, LEFT, NUMWANT
 from ..errors import TrackerError
 from ..peers import Peer
 from ..util import TRACE, InfoHash, log
@@ -39,7 +39,9 @@ class HTTPTracker(Tracker):
         else:
             target = f"{url}?{params}"
         try:
-            async with AsyncClient(follow_redirects=True) as client:
+            async with AsyncClient(
+                follow_redirects=True, headers={"User-Agent": CLIENT}
+            ) as client:
                 r = await client.get(target)
                 if r.is_error:
                     raise TrackerError(
