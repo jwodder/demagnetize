@@ -113,12 +113,12 @@ def yield_lines(fp: Iterable[str]) -> Iterator[str]:
             yield line
 
 
-def template_torrent_filename(pattern: str, torrent: Torrent) -> str:
+def template_torrent_filename(fntemplate: str, torrent: Torrent) -> str:
     fields = {
         "name": sanitize_pathname(str(torrent.name)),
         "hash": torrent.infohash,
     }
-    return pattern.format_map(fields)
+    return fntemplate.format_map(fields)
 
 
 def sanitize_pathname(s: str) -> str:

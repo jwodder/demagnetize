@@ -35,7 +35,7 @@ class Demagnetizer:
         log.log(TRACE, "Using peer port = %d", self.peer_port)
 
     async def download_torrent_info(
-        self, magnets: List[Union[str, Magnet]], outfile_pattern: str
+        self, magnets: List[Union[str, Magnet]], fntemplate: str
     ) -> Report:
         funcs: List[Callable[[], Awaitable[Report]]] = []
         for m in magnets:
@@ -45,7 +45,7 @@ class Demagnetizer:
                 except ValueError:
                     log.error("Invalid magnet URL: %s", m)
                     continue
-            funcs.append(partial(self.demagnetize2file, m, outfile_pattern))
+            funcs.append(partial(self.demagnetize2file, m, fntemplate))
         report = Report()
         if funcs:
             async with acollect(funcs) as ait:
@@ -53,10 +53,10 @@ class Demagnetizer:
                     report += r
         return report
 
-    async def demagnetize2file(self, magnet: Magnet, pattern: str) -> Report:
+    async def demagnetize2file(self, magnet: Magnet, fntemplate: str) -> Report:
         try:
             torrent = await self.demagnetize(magnet)
-            filename = template_torrent_filename(pattern, torrent)
+            filename = template_torrent_filename(fntemplate, torrent)
             log.info(
                 "Saving torrent for info hash %s to file %s", magnet.infohash, filename
             )
