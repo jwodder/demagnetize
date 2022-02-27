@@ -18,8 +18,11 @@ class HTTPTracker(Tracker):
     peer_id: bytes
     peer_port: int
 
+    def __str__(self) -> str:
+        return f"<Tracker {self.url}>"
+
     async def get_peers(self, info_hash: InfoHash) -> List[Peer]:
-        log.info("Requesting peers for %s from tracker at %s", info_hash, self.url)
+        log.info("Requesting peers for %s from %s", info_hash, self)
         # As of v0.22.0, the only way to send a bytes query parameter through
         # httpx is if we do all of the encoding ourselves.
         params = (
@@ -44,29 +47,22 @@ class HTTPTracker(Tracker):
             ) as client:
                 r = await client.get(target)
                 if r.is_error:
-                    raise TrackerError(
-                        f"Request to tracker {self.url} returned {r.status_code}"
-                    )
+                    raise TrackerError(f"Request to {self} returned {r.status_code}")
                 ### TODO: Should we send a "stopped" event to the tracker now?
         except HTTPError as e:
             raise TrackerError(
-                f"Error communicating with tracker {self.url}: {type(e).__name__}: {e}"
+                f"Error communicating with {self}: {type(e).__name__}: {e}"
             )
-        log.log(TRACE, "Tracker at %s replied with: %r", self.url, r.content)
+        log.log(TRACE, "%s replied with: %r", self, r.content)
         try:
             response = self.parse_response(r.content)
         except ValueError as e:
-            raise TrackerError(f"Bad response from tracker at {self.url}: {e}")
+            raise TrackerError(f"Bad response from {self}: {e}")
         peers = cast(
             List[Peer], response.get(b"peers", []) + response.get(b"peers6", [])
         )
-        log.info("Tracker at %s returned %d peers", self.url, len(peers))
-        log.log(
-            TRACE,
-            "Tracker at %s returned peers: %s",
-            self.url,
-            ", ".join(map(str, peers)),
-        )
+        log.info("%s returned %d peers", self, len(peers))
+        log.log(TRACE, "%s returned peers: %s", self, ", ".join(map(str, peers)))
         return peers
 
     @staticmethod

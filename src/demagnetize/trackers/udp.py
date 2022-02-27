@@ -43,6 +43,9 @@ class UDPTracker(Tracker):
         self.host = self.url.host
         self.port = self.url.port
 
+    def __str__(self) -> str:
+        return f"<Tracker {self.url}>"
+
     async def get_peers(self, info_hash: InfoHash) -> List[Peer]:
         async with await create_connected_udp_socket(self.host, self.port) as conn:
             async with Communicator(tracker=self, conn=conn) as cmm:
@@ -69,17 +72,15 @@ class Communicator(AsyncResource):
             except TimeoutError:
                 log.log(
                     TRACE,
-                    "Connection to tracker at %s timed out; restarting",
-                    self.tracker.url,
+                    "Connection to %s timed out; restarting",
+                    self.tracker,
                 )
             else:
-                log.info(
-                    "Tracker at %s returned %d peers", self.tracker.url, len(r.peers)
-                )
+                log.info("%s returned %d peers", self.tracker, len(r.peers))
                 log.log(
                     TRACE,
-                    "Tracker at %s returned peers: %s",
-                    self.tracker.url,
+                    "%s returned peers: %s",
+                    self.tracker,
                     ", ".join(map(str, r.peers)),
                 )
                 return r.peers
@@ -98,7 +99,7 @@ class Communicator(AsyncResource):
         with ctx:
             n = 0
             while True:
-                log.log(TRACE, "Sending to tracker at %s: %r", self.tracker.url, msg)
+                log.log(TRACE, "Sending to %s: %r", self.tracker, msg)
                 await self.conn.send(msg)
                 try:
                     with fail_after(15 << n):
@@ -108,24 +109,22 @@ class Communicator(AsyncResource):
                         raise
                     log.log(
                         TRACE,
-                        "Tracker at %s did not reply in time; resending message",
-                        self.tracker.url,
+                        "%s did not reply in time; resending message",
+                        self.tracker,
                     )
                     if n < 8:
                         ### TODO: Should this count remember timeouts from
                         ### previous connections & connection attempts?
                         n += 1
                     continue
-                log.log(
-                    TRACE, "Tracker at %s responded with: %r", self.tracker.url, resp
-                )
+                log.log(TRACE, "%s responded with: %r", self.tracker, resp)
                 try:
                     data = response_parser(resp)
                 except Exception as e:
                     log.log(
                         TRACE,
-                        "Response from tracker at %s was invalid, will resend: %s: %s",
-                        self.tracker.url,
+                        "Response from %s was invalid, will resend: %s: %s",
+                        self.tracker,
                         type(e).__name__,
                         e,
                     )
