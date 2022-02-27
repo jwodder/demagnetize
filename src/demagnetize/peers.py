@@ -15,9 +15,10 @@ class Peer:
 
     def __str__(self) -> str:
         if ":" in self.host:
-            return f"[{self.host}]:{self.port}"
+            addr = f"[{self.host}]:{self.port}"
         else:
-            return f"{self.host}:{self.port}"
+            addr = f"{self.host}:{self.port}"
+        return f"<Peer {addr}>"
 
     def for_json(self) -> Dict[str, Any]:
         pid: Optional[str]
@@ -29,14 +30,14 @@ class Peer:
 
     @asynccontextmanager
     async def connect(self) -> AsyncIterator[ConnectedPeer]:
-        log.debug("Connecting to peer at %s", self)
+        log.debug("Connecting to %s", self)
         async with await connect_tcp(self.host, self.port) as conn:
-            log.debug("Connected to peer at %s", self)
+            log.debug("Connected to %s", self)
             async with ConnectedPeer(conn) as connpeer:
                 yield connpeer
 
     async def get_metadata(self, info_hash: InfoHash) -> dict:
-        log.info("Requesting metadata for %s from peer %s", info_hash, self)
+        log.info("Requesting metadata for %s from %s", info_hash, self)
         async with self.connect() as connpeer:
             return await connpeer.get_metadata(info_hash)
 

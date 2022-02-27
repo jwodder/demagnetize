@@ -140,7 +140,7 @@ class Demagnetizer:
                 await sender.send(md)
             except Error as e:
                 log.warning(
-                    "Error getting metadata for %s from peer %s: %s",
+                    "Error getting metadata for %s from %s: %s",
                     info_hash,
                     peer,
                     e,
