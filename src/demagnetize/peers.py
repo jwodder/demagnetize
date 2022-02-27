@@ -36,10 +36,10 @@ class Peer:
             async with ConnectedPeer(conn) as connpeer:
                 yield connpeer
 
-    async def get_metadata(self, info_hash: InfoHash) -> dict:
-        log.info("Requesting metadata for %s from %s", info_hash, self)
+    async def get_info(self, info_hash: InfoHash) -> dict:
+        log.info("Requesting info for %s from %s", info_hash, self)
         async with self.connect() as connpeer:
-            return await connpeer.get_metadata(info_hash)
+            return await connpeer.get_info(info_hash)
 
 
 @dataclass
@@ -49,5 +49,5 @@ class ConnectedPeer(AsyncResource):
     async def aclose(self) -> None:
         await self.conn.aclose()
 
-    async def get_metadata(self, info_hash: InfoHash) -> dict:
+    async def get_info(self, info_hash: InfoHash) -> dict:
         raise NotImplementedError

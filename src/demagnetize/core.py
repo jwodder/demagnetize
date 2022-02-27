@@ -70,8 +70,8 @@ class Demagnetizer:
         info_hash = InfoHash.from_string(magnet.infohash)
         if not magnet.tr:
             raise DemagnetizeFailure(
-                f"Cannot fetch metadata for info hash {info_hash}: No trackers"
-                " in magnet URL"
+                f"Cannot fetch info for info hash {info_hash}: No trackers in"
+                " magnet URL"
             )
         async with create_task_group() as tg:
             peer_sender, peer_receiver = create_memory_object_stream()
@@ -83,16 +83,14 @@ class Demagnetizer:
                         info_hash,
                         peer_sender.clone(),
                     )
-            metadata_sender, metadata_receiver = create_memory_object_stream()
-            tg.start_soon(
-                self.pipe_peers, info_hash, tg, peer_receiver, metadata_sender
-            )
-            async with metadata_receiver:
+            info_sender, info_receiver = create_memory_object_stream()
+            tg.start_soon(self.pipe_peers, info_hash, tg, peer_receiver, info_sender)
+            async with info_receiver:
                 try:
-                    md = await metadata_receiver.receive()
+                    md = await info_receiver.receive()
                 except EndOfStream:
                     raise DemagnetizeFailure(
-                        f"Could not fetch metadata for info hash {info_hash}"
+                        f"Could not fetch info for info hash {info_hash}"
                     )
             tg.cancel_scope.cancel()
         return compose_torrent(magnet, md)
@@ -122,27 +120,27 @@ class Demagnetizer:
         info_hash: InfoHash,
         task_group: TaskGroup,
         peer_receiver: MemoryObjectReceiveStream[Peer],
-        metadata_sender: MemoryObjectSendStream[dict],
+        info_sender: MemoryObjectSendStream[dict],
     ) -> None:
-        async with peer_receiver, metadata_sender:
+        async with peer_receiver, info_sender:
             async for peer in peer_receiver:
                 task_group.start_soon(
-                    self.get_metadata_from_peer,
+                    self.get_info_from_peer,
                     peer,
                     info_hash,
-                    metadata_sender.clone(),
+                    info_sender.clone(),
                 )
 
-    async def get_metadata_from_peer(
+    async def get_info_from_peer(
         self, peer: Peer, info_hash: InfoHash, sender: MemoryObjectSendStream[dict]
     ) -> None:
         async with sender:
             try:
-                md = await peer.get_metadata(info_hash)
+                md = await peer.get_info(info_hash)
                 await sender.send(md)
             except Error as e:
                 log.warning(
-                    "Error getting metadata for %s from %s: %s",
+                    "Error getting info for %s from %s: %s",
                     info_hash,
                     peer,
                     e,
@@ -169,9 +167,9 @@ class Demagnetizer:
             raise TrackerError(f"Unsupported URL scheme {u.scheme!r}")
 
 
-def compose_torrent(magnet: Magnet, metadata: dict) -> Torrent:
+def compose_torrent(magnet: Magnet, info: dict) -> Torrent:
     torrent = Torrent()
-    torrent.metadata["info"] = metadata
+    torrent.metadata["info"] = info
     torrent.trackers = magnet.tr
     torrent.created_by = CLIENT
     torrent.creation_date = time()
