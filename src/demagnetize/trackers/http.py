@@ -2,11 +2,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, ClassVar, List, Optional, Type, TypeVar, cast
 from urllib.parse import quote
 import attr
-from flatbencode import decode
 from httpx import AsyncClient, HTTPError
 from .base import Tracker, TrackerSession, unpack_peers, unpack_peers6
+from ..bencode import unbencode
 from ..consts import CLIENT, LEFT, NUMWANT
-from ..errors import TrackerError
+from ..errors import TrackerError, UnbencodeError
 from ..peer import Peer
 from ..util import TRACE, InfoHash, log
 
@@ -104,8 +104,8 @@ class Response:
     def parse(cls, content: bytes) -> Response:
         # Unknown fields and (most) fields of the wrong type are discarded
         try:
-            data = decode(content)
-        except ValueError:
+            data = unbencode(content)
+        except UnbencodeError:
             raise ValueError("invalid bencoded data")
         if not isinstance(data, dict):
             raise ValueError("invalid response")

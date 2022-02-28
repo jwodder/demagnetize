@@ -8,3 +8,7 @@ class TrackerError(Error):
 
 class DemagnetizeFailure(Error):
     pass
+
+
+class UnbencodeError(ValueError):
+    pass
