@@ -1,21 +1,41 @@
 from __future__ import annotations
-from typing import Any, List, Optional, Type, TypeVar, cast
+from typing import TYPE_CHECKING, Any, List, Optional, Type, TypeVar, cast
 from urllib.parse import quote
 import attr
 from flatbencode import decode
 from httpx import AsyncClient, HTTPError
-from .base import Tracker, unpack_peers, unpack_peers6
+from .base import Tracker, TrackerSession, unpack_peers, unpack_peers6
 from ..consts import CLIENT, LEFT, NUMWANT
 from ..errors import TrackerError
 from ..peer import Peer
 from ..util import TRACE, InfoHash, log
 
+if TYPE_CHECKING:
+    from ..core import Demagnetizer
+
 T = TypeVar("T")
 
 
 class HTTPTracker(Tracker):
-    async def get_peers(self, info_hash: InfoHash) -> List[Peer]:
-        log.info("Requesting peers for %s from %s", info_hash, self)
+    async def connect(self, app: Demagnetizer) -> HTTPTrackerSession:
+        return HTTPTrackerSession(
+            tracker=self,
+            app=app,
+            client=AsyncClient(follow_redirects=True, headers={"User-Agent": CLIENT}),
+        )
+
+
+@attr.define
+class HTTPTrackerSession(TrackerSession):
+    tracker: HTTPTracker
+    app: Demagnetizer
+    client: AsyncClient
+
+    async def aclose(self) -> None:
+        await self.client.aclose()
+
+    async def announce(self, info_hash: InfoHash) -> List[Peer]:
+        log.info("Requesting peers for %s from %s", info_hash, self.tracker)
         # As of v0.22.0, the only way to send a bytes query parameter through
         # httpx is if we do all of the encoding ourselves.
         params = (
@@ -30,35 +50,39 @@ class HTTPTracker(Tracker):
             f"&numwant={NUMWANT}"
             f"&key={quote(str(self.app.key))}"
         )
-        url = self.url.with_fragment(None)
+        url = self.tracker.url.with_fragment(None)
         if url.query_string:
             target = f"{url}&{params}"
         else:
             target = f"{url}?{params}"
         try:
-            async with AsyncClient(
-                follow_redirects=True, headers={"User-Agent": CLIENT}
-            ) as client:
-                r = await client.get(target)
-                if r.is_error:
-                    raise TrackerError(f"Request to {self} returned {r.status_code}")
-                ### TODO: Should we send a "stopped" event to the tracker now?
+            r = await self.client.get(target)
         except (HTTPError, OSError) as e:
             raise TrackerError(
-                f"Error communicating with {self}: {type(e).__name__}: {e}"
+                f"Error communicating with {self.tracker}: {type(e).__name__}: {e}"
             )
-        log.log(TRACE, "%s replied with: %r", self, r.content)
+        if r.is_error:
+            raise TrackerError(f"Request to {self.tracker} returned {r.status_code}")
+        ### TODO: Should we send a "stopped" event to the tracker now?
+        log.log(TRACE, "%s replied with: %r", self.tracker, r.content)
         try:
             response = Response.parse(r.content)
         except ValueError as e:
-            raise TrackerError(f"Bad response from {self}: {e}")
+            raise TrackerError(f"Bad response from {self.tracker}: {e}")
         if response.failure_reason is not None:
-            raise TrackerError(f"Request to {self} failed: {response.failure_reason}")
+            raise TrackerError(
+                f"Request to {self.tracker} failed: {response.failure_reason}"
+            )
         if response.warning_message is not None:
-            log.info("%s replied with warning: %s", self, response.warning_message)
-        log.info("%s returned %d peers", self, len(response.peers))
+            log.info(
+                "%s replied with warning: %s", self.tracker, response.warning_message
+            )
+        log.info("%s returned %d peers", self.tracker, len(response.peers))
         log.log(
-            TRACE, "%s returned peers: %s", self, ", ".join(map(str, response.peers))
+            TRACE,
+            "%s returned peers: %s",
+            self.tracker,
+            ", ".join(map(str, response.peers)),
         )
         return response.peers
 

@@ -6,15 +6,27 @@ from random import randint
 from socket import AF_INET6
 import struct
 from time import time
-from typing import Any, Callable, ContextManager, List, Optional, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    ContextManager,
+    List,
+    Optional,
+    TypeVar,
+    Union,
+)
 from anyio import create_connected_udp_socket, fail_after
-from anyio.abc import AsyncResource, ConnectedUDPSocket, SocketAttribute
+from anyio.abc import ConnectedUDPSocket, SocketAttribute
 import attr
-from .base import Tracker, unpack_peers, unpack_peers6
+from .base import Tracker, TrackerSession, unpack_peers, unpack_peers6
 from ..consts import LEFT, NUMWANT
 from ..errors import TrackerError
 from ..peer import Peer
 from ..util import TRACE, InfoHash, Key, log
+
+if TYPE_CHECKING:
+    from ..core import Demagnetizer
 
 T = TypeVar("T")
 
@@ -36,40 +48,47 @@ class UDPTracker(Tracker):
         self.host = self.url.host
         self.port = self.url.port
 
-    async def get_peers(self, info_hash: InfoHash) -> List[Peer]:
-        try:
-            async with await create_connected_udp_socket(self.host, self.port) as conn:
-                async with Communicator(tracker=self, conn=conn) as cmm:
-                    return await cmm.get_peers(info_hash)
-        except OSError as e:
-            raise TrackerError(
-                f"Error communicating with {self}: {type(e).__name__}: {e}"
-            )
+    async def connect(self, app: Demagnetizer) -> UDPTrackerSession:
+        s = await create_connected_udp_socket(self.host, self.port)
+        return UDPTrackerSession(tracker=self, app=app, socket=s)
 
 
 @attr.define
-class Communicator(AsyncResource):
+class UDPTrackerSession(TrackerSession):
     tracker: UDPTracker
-    conn: ConnectedUDPSocket
+    app: Demagnetizer
+    socket: ConnectedUDPSocket
+    connection: Optional[Connection] = None
 
     @property
     def is_ipv6(self) -> bool:
-        return self.conn.extra(SocketAttribute.family) == AF_INET6
+        return self.socket.extra(SocketAttribute.family) == AF_INET6
 
     async def aclose(self) -> None:
-        await self.conn.aclose()
+        await self.socket.aclose()
 
-    async def get_peers(self, info_hash: InfoHash) -> List[Peer]:
+    async def connect(self) -> None:
+        transaction_id = make_transaction_id()
+        conn_id = await self.send_receive(
+            build_connection_request(transaction_id),
+            partial(parse_connection_response, transaction_id),
+        )
+        self.connection = Connection(session=self, id=conn_id)
+
+    async def announce(self, info_hash: InfoHash) -> List[Peer]:
         while True:
+            if self.connection is None:
+                await self.connect()
+                assert self.connection is not None
             try:
-                cnx = await self.connect()
-                r = await cnx.announce(info_hash)
-            except TimeoutError:
+                r = await self.connection.announce(info_hash)
+            except ConnectionTimeoutError:
                 log.log(
                     TRACE,
                     "Connection to %s timed out; restarting",
                     self.tracker,
                 )
+                self.connection = None
             else:
                 log.info("%s returned %d peers", self.tracker, len(r.peers))
                 log.log(
@@ -91,58 +110,55 @@ class Communicator(AsyncResource):
             ctx = nullcontext()
         else:
             ctx = fail_after(expiration - time())
-        with ctx:
-            n = 0
-            while True:
-                log.log(TRACE, "Sending to %s: %r", self.tracker, msg)
-                await self.conn.send(msg)
-                try:
-                    with fail_after(15 << n):
-                        resp = await self.conn.receive()
-                except TimeoutError:
-                    log.log(
-                        TRACE,
-                        "%s did not reply in time; resending message",
-                        self.tracker,
-                    )
-                    if n < 8:
-                        ### TODO: Should this count remember timeouts from
-                        ### previous connections & connection attempts?
-                        n += 1
-                    continue
-                log.log(TRACE, "%s responded with: %r", self.tracker, resp)
-                try:
-                    data = response_parser(resp)
-                except Exception as e:
-                    log.log(
-                        TRACE,
-                        "Response from %s was invalid, will resend: %s: %s",
-                        self.tracker,
-                        type(e).__name__,
-                        e,
-                    )
-                    continue
-                else:
-                    if isinstance(data, ErrorResponse):
-                        raise TrackerError(f"{self} replied with error: {data.message}")
-                    return data
-
-    async def connect(self) -> Connection:
-        transaction_id = make_transaction_id()
-        conn_id = await self.send_receive(
-            build_connection_request(transaction_id),
-            partial(parse_connection_response, transaction_id),
-        )
-        return Connection(communicator=self, id=conn_id)
+        try:
+            with ctx:
+                n = 0
+                while True:
+                    log.log(TRACE, "Sending to %s: %r", self.tracker, msg)
+                    await self.socket.send(msg)
+                    try:
+                        with fail_after(15 << n):
+                            resp = await self.socket.receive()
+                    except TimeoutError:
+                        log.log(
+                            TRACE,
+                            "%s did not reply in time; resending message",
+                            self.tracker,
+                        )
+                        if n < 8:
+                            ### TODO: Should this count remember timeouts from
+                            ### previous connections & connection attempts?
+                            n += 1
+                        continue
+                    log.log(TRACE, "%s responded with: %r", self.tracker, resp)
+                    try:
+                        data = response_parser(resp)
+                    except Exception as e:
+                        log.log(
+                            TRACE,
+                            "Response from %s was invalid, will resend: %s: %s",
+                            self.tracker,
+                            type(e).__name__,
+                            e,
+                        )
+                        continue
+                    else:
+                        if isinstance(data, ErrorResponse):
+                            raise TrackerError(
+                                f"{self.tracker} replied with error: {data.message}"
+                            )
+                        return data
+        except TimeoutError:
+            raise ConnectionTimeoutError
 
 
 @attr.define
 class Connection:
-    communicator: Communicator
+    session: UDPTrackerSession
     id: int
     expiration: float = attr.field(init=False)
 
-    def __post_init__(self) -> None:
+    def __attrs_post_init__(self) -> None:
         self.expiration = time() + 60
 
     async def announce(self, info_hash: InfoHash) -> AnnounceResponse:
@@ -151,19 +167,23 @@ class Connection:
             transaction_id=transaction_id,
             connection_id=self.id,
             info_hash=info_hash,
-            peer_id=self.communicator.tracker.app.peer_id,
-            peer_port=self.communicator.tracker.app.peer_port,
-            key=self.communicator.tracker.app.key,
+            peer_id=self.session.app.peer_id,
+            peer_port=self.session.app.peer_port,
+            key=self.session.app.key,
         )
-        return await self.communicator.send_receive(
+        return await self.session.send_receive(
             msg,
             partial(
                 parse_announce_response,
                 transaction_id,
-                is_ipv6=self.communicator.is_ipv6,
+                is_ipv6=self.session.is_ipv6,
             ),
             expiration=self.expiration,
         )
+
+
+class ConnectionTimeoutError(Exception):
+    pass
 
 
 @attr.define
@@ -200,9 +220,9 @@ def get_error_response(resp: bytes) -> Optional[ErrorResponse]:
 def parse_connection_response(
     transaction_id: int, resp: bytes
 ) -> Union[int, ErrorResponse]:
+    # Returns connection ID or error
     if (er := get_error_response(resp)) is not None:
         return er
-    # Returns connection ID
     action, xaction_id, connection_id = struct.unpack_from("!iiq", resp)
     # Use `struct.unpack_from()` instead of `unpack()` because "Clients ...
     # should not assume packets to be of a certain size"

@@ -19,7 +19,7 @@ class TorrentSession:
     magnet: Magnet
     info_hash: InfoHash = attr.field(init=False)
 
-    def __post_init__(self) -> None:
+    def __attrs_post_init__(self) -> None:
         # torf only accepts magnet URLs with valid info hashes, so this
         # shouldn't fail:
         self.info_hash = InfoHash.from_string(self.magnet.infohash)
@@ -62,7 +62,7 @@ class TorrentSession:
         async with sender:
             try:
                 tracker = self.app.get_tracker(url)
-                peers = await tracker.get_peers(self.info_hash)
+                peers = await tracker.get_peers(self.app, self.info_hash)
                 for p in peers:
                     await sender.send(p)
             except Error as e:

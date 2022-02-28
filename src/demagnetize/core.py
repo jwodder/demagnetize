@@ -29,7 +29,7 @@ class Demagnetizer:
     peer_id: bytes = attr.Factory(make_peer_id)
     peer_port: int = attr.Factory(lambda: randint(1025, 65535))
 
-    def __post_init__(self) -> None:
+    def __attrs_post_init__(self) -> None:
         log.log(TRACE, "Using key = %s", self.key)
         log.log(TRACE, "Using peer ID = %r", self.peer_id)
         log.log(TRACE, "Using peer port = %d", self.peer_port)
@@ -78,7 +78,7 @@ class Demagnetizer:
 
     async def get_peers(self, tracker_url: str, info_hash: InfoHash) -> List[Peer]:
         tracker = self.get_tracker(tracker_url)
-        return await tracker.get_peers(info_hash)
+        return await tracker.get_peers(self, info_hash)
 
     def open_session(self, magnet: Magnet) -> TorrentSession:
         return TorrentSession(app=self, magnet=magnet)
@@ -89,15 +89,15 @@ class Demagnetizer:
         except ValueError:
             raise TrackerError("Invalid tracker URL")
         if u.scheme in ("http", "https"):
-            return HTTPTracker(app=self, url=u)
+            return HTTPTracker(url=u)
         elif u.scheme == "udp":
             try:
                 # <https://github.com/python/mypy/issues/12259>
-                return UDPTracker(app=self, url=u)  # type: ignore[call-arg]
+                return UDPTracker(url=u)  # type: ignore[call-arg]
             except ValueError as e:
                 raise TrackerError(f"Invalid tracker URL: {e}")
         else:
-            raise TrackerError(f"Unsupported URL scheme {u.scheme!r}")
+            raise TrackerError(f"Unsupported tracker URL scheme {u.scheme!r}")
 
 
 def compose_torrent(magnet: Magnet, info: dict) -> Torrent:
