@@ -2,10 +2,11 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from ipaddress import AddressValueError, IPv4Address, IPv6Address
 import struct
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, ClassVar, List
 from anyio.abc import AsyncResource
 import attr
 from yarl import URL
+from ..errors import TrackerError
 from ..peer import Peer
 from ..util import InfoHash
 
@@ -15,10 +16,25 @@ if TYPE_CHECKING:
 
 @attr.define
 class Tracker(ABC):
+    SCHEMES: ClassVar[List[str]]
     url: URL
 
     def __str__(self) -> str:
         return f"<Tracker {self.url}>"
+
+    @classmethod
+    def from_url(cls, url: str) -> Tracker:
+        try:
+            u = URL(url)
+        except ValueError:
+            raise TrackerError("Invalid tracker URL")
+        for klass in Tracker.__subclasses__():
+            if u.scheme in klass.SCHEMES:
+                try:
+                    return klass(url=u)  # type: ignore[abstract]
+                except ValueError as e:
+                    raise TrackerError(f"Invalid tracker URL: {e}")
+        raise TrackerError(f"Unsupported tracker URL scheme {u.scheme!r}")
 
     async def get_peers(self, app: Demagnetizer, info_hash: InfoHash) -> List[Peer]:
         async with await self.connect(app) as conn:

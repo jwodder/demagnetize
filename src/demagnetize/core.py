@@ -5,12 +5,11 @@ from typing import Awaitable, Callable, List, Union
 import attr
 import click
 from torf import Magnet, Torrent
-from yarl import URL
 from .consts import CLIENT
-from .errors import DemagnetizeFailure, TrackerError
+from .errors import DemagnetizeFailure
 from .peer import Peer
 from .session import TorrentSession
-from .trackers import HTTPTracker, Tracker, UDPTracker
+from .trackers import Tracker
 from .util import (
     TRACE,
     InfoHash,
@@ -77,27 +76,11 @@ class Demagnetizer:
         return compose_torrent(magnet, md)
 
     async def get_peers(self, tracker_url: str, info_hash: InfoHash) -> List[Peer]:
-        tracker = self.get_tracker(tracker_url)
+        tracker = Tracker.from_url(tracker_url)
         return await tracker.get_peers(self, info_hash)
 
     def open_session(self, magnet: Magnet) -> TorrentSession:
         return TorrentSession(app=self, magnet=magnet)
-
-    def get_tracker(self, url: str) -> Tracker:
-        try:
-            u = URL(url)
-        except ValueError:
-            raise TrackerError("Invalid tracker URL")
-        if u.scheme in ("http", "https"):
-            return HTTPTracker(url=u)
-        elif u.scheme == "udp":
-            try:
-                # <https://github.com/python/mypy/issues/12259>
-                return UDPTracker(url=u)  # type: ignore[call-arg]
-            except ValueError as e:
-                raise TrackerError(f"Invalid tracker URL: {e}")
-        else:
-            raise TrackerError(f"Unsupported tracker URL scheme {u.scheme!r}")
 
 
 def compose_torrent(magnet: Magnet, info: dict) -> Torrent:

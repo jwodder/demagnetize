@@ -10,6 +10,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    ClassVar,
     ContextManager,
     List,
     Optional,
@@ -35,6 +36,8 @@ PROTOCOL_ID = 0x41727101980
 
 @attr.define
 class UDPTracker(Tracker):
+    SCHEMES: ClassVar[List[str]] = ["udp"]
+
     host: str = attr.field(init=False)
     port: int = attr.field(init=False)
 

@@ -7,6 +7,7 @@ import attr
 from torf import Magnet
 from .errors import DemagnetizeFailure, Error
 from .peer import Peer
+from .trackers import Tracker
 from .util import InfoHash, log
 
 if TYPE_CHECKING:
@@ -61,7 +62,7 @@ class TorrentSession:
     ) -> None:
         async with sender:
             try:
-                tracker = self.app.get_tracker(url)
+                tracker = Tracker.from_url(url)
                 peers = await tracker.get_peers(self.app, self.info_hash)
                 for p in peers:
                     await sender.send(p)

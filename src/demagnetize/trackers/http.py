@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, List, Optional, Type, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, List, Optional, Type, TypeVar, cast
 from urllib.parse import quote
 import attr
 from flatbencode import decode
@@ -17,6 +17,8 @@ T = TypeVar("T")
 
 
 class HTTPTracker(Tracker):
+    SCHEMES: ClassVar[List[str]] = ["http", "https"]
+
     async def connect(self, app: Demagnetizer) -> HTTPTrackerSession:
         return HTTPTrackerSession(
             tracker=self,
