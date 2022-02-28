@@ -67,37 +67,40 @@ class UDPTrackerSession(TrackerSession):
     async def aclose(self) -> None:
         await self.socket.aclose()
 
-    async def connect(self) -> None:
-        transaction_id = make_transaction_id()
-        conn_id = await self.send_receive(
-            build_connection_request(transaction_id),
-            partial(parse_connection_response, transaction_id),
-        )
-        self.connection = Connection(session=self, id=conn_id)
+    async def get_connection(self) -> Connection:
+        if self.connection is None:
+            transaction_id = make_transaction_id()
+            conn_id = await self.send_receive(
+                build_connection_request(transaction_id),
+                partial(parse_connection_response, transaction_id),
+            )
+            self.connection = Connection(session=self, id=conn_id)
+        return self.connection
+
+    def reset_connection(self) -> None:
+        self.connection = None
 
     async def announce(self, info_hash: InfoHash) -> List[Peer]:
         while True:
-            if self.connection is None:
-                await self.connect()
-                assert self.connection is not None
+            conn = await self.get_connection()
             try:
-                r = await self.connection.announce(info_hash)
+                r = await conn.announce(info_hash)
             except ConnectionTimeoutError:
                 log.log(
                     TRACE,
                     "Connection to %s timed out; restarting",
                     self.tracker,
                 )
-                self.connection = None
-            else:
-                log.info("%s returned %d peers", self.tracker, len(r.peers))
-                log.log(
-                    TRACE,
-                    "%s returned peers: %s",
-                    self.tracker,
-                    ", ".join(map(str, r.peers)),
-                )
-                return r.peers
+                self.reset_connection()
+                continue
+            log.info("%s returned %d peers", self.tracker, len(r.peers))
+            log.log(
+                TRACE,
+                "%s returned peers: %s",
+                self.tracker,
+                ", ".join(map(str, r.peers)),
+            )
+            return r.peers
 
     async def send_receive(
         self,
@@ -142,12 +145,11 @@ class UDPTrackerSession(TrackerSession):
                             e,
                         )
                         continue
-                    else:
-                        if isinstance(data, ErrorResponse):
-                            raise TrackerError(
-                                f"{self.tracker} replied with error: {data.message}"
-                            )
-                        return data
+                    if isinstance(data, ErrorResponse):
+                        raise TrackerError(
+                            f"{self.tracker} replied with error: {data.message}"
+                        )
+                    return data
         except TimeoutError:
             raise ConnectionTimeoutError
 
