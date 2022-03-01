@@ -1,13 +1,14 @@
 import json
 import logging
 from pathlib import Path
-from typing import Optional, TextIO
+from typing import List, Optional, TextIO
 import anyio
 import click
 from click_loglevel import LogLevel
 from torf import Magnet
 from .core import Demagnetizer
 from .peer import Peer
+from .trackers import Tracker
 from .util import TRACE, InfoHash, log, yield_lines
 
 
@@ -57,11 +58,20 @@ def get(ctx: click.Context, magnet: Magnet, outfile: str) -> None:
 @click.pass_context
 def batch(ctx: click.Context, magnetfile: TextIO, outfile: str) -> None:
     """Convert a collection of magnet URLs to .torrent files"""
+    magnets: List[Magnet] = []
+    ok = True
     with magnetfile:
-        magnets = list(yield_lines(magnetfile))
+        for line in yield_lines(magnetfile):
+            try:
+                m = Magnet.from_string(line)
+            except ValueError:
+                log.error("Invalid magnet URL: %s", line)
+                ok = False
+            else:
+                magnets.append(m)
     if not magnets:
         log.info("No magnet URLs to fetch")
-        return
+        ctx.exit(0 if ok else 1)
     demagnetizer = Demagnetizer()
     r = anyio.run(demagnetizer.download_torrent_info, magnets, outfile)
     log.info(
@@ -72,9 +82,9 @@ def batch(ctx: click.Context, magnetfile: TextIO, outfile: str) -> None:
 
 
 @main.command()
-@click.argument("tracker")
+@click.argument("tracker", type=Tracker.from_url)
 @click.argument("infohash", type=InfoHash.from_string)
-def get_peers(tracker: str, infohash: InfoHash) -> None:
+def get_peers(tracker: Tracker, infohash: InfoHash) -> None:
     demagnetizer = Demagnetizer()
     peers = anyio.run(demagnetizer.get_peers, tracker, infohash)
     for p in peers:

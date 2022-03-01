@@ -1,6 +1,6 @@
 from random import randint
 from time import time
-from typing import Awaitable, List, Union
+from typing import List
 import attr
 import click
 from torf import Magnet, Torrent
@@ -34,22 +34,13 @@ class Demagnetizer:
         log.log(TRACE, "Using peer port = %d", self.peer_port)
 
     async def download_torrent_info(
-        self, magnets: List[Union[str, Magnet]], fntemplate: str
+        self, magnets: List[Magnet], fntemplate: str
     ) -> Report:
-        coros: List[Awaitable[Report]] = []
-        for m in magnets:
-            if not isinstance(m, Magnet):
-                try:
-                    m = Magnet.from_string(m)
-                except ValueError:
-                    log.error("Invalid magnet URL: %s", m)
-                    continue
-            coros.append(self.demagnetize2file(m, fntemplate))
         report = Report()
-        if coros:
-            async with acollect(coros) as ait:
-                async for r in ait:
-                    report += r
+        coros = [self.demagnetize2file(m, fntemplate) for m in magnets]
+        async with acollect(coros) as ait:
+            async for r in ait:
+                report += r
         return report
 
     async def demagnetize2file(self, magnet: Magnet, fntemplate: str) -> Report:
@@ -75,8 +66,7 @@ class Demagnetizer:
         md = await session.get_info()
         return compose_torrent(magnet, md)
 
-    async def get_peers(self, tracker_url: str, info_hash: InfoHash) -> List[Peer]:
-        tracker = Tracker.from_url(tracker_url)
+    async def get_peers(self, tracker: Tracker, info_hash: InfoHash) -> List[Peer]:
         return await tracker.get_peers(self, info_hash)
 
     async def get_info_from_peer(self, peer: Peer, info_hash: InfoHash) -> bytes:
