@@ -8,7 +8,6 @@ from string import ascii_letters, digits
 from typing import (
     AsyncIterator,
     Awaitable,
-    Callable,
     Generic,
     Iterable,
     Iterator,
@@ -141,24 +140,42 @@ def make_peer_id() -> bytes:
 
 
 @asynccontextmanager
-async def acollect(
-    funcs: Iterable[Callable[[], Awaitable[T]]]
-) -> AsyncIterator[AsyncIterator[T]]:
+async def acollect(coros: Iterable[Awaitable[T]]) -> AsyncIterator[AsyncIterator[T]]:
     async with create_task_group() as tg:
         sender, receiver = create_memory_object_stream()
         async with sender:
-            for f in funcs:
-                tg.start_soon(_acollect_pipe, f, sender.clone())
+            for c in coros:
+                tg.start_soon(_acollect_pipe, c, sender.clone())
         async with receiver:
             yield receiver
 
 
-async def _acollect_pipe(
-    func: Callable[[], Awaitable[T]], sender: MemoryObjectSendStream[T]
+async def _acollect_pipe(coro: Awaitable[T], sender: MemoryObjectSendStream[T]) -> None:
+    async with sender:
+        value = await coro
+        await sender.send(value)
+
+
+@asynccontextmanager
+async def acollectiter(
+    coros: Iterable[Awaitable[Iterable[T]]],
+) -> AsyncIterator[AsyncIterator[T]]:
+    async with create_task_group() as tg:
+        sender, receiver = create_memory_object_stream()
+        async with sender:
+            for c in coros:
+                tg.start_soon(_acollectiter_pipe, c, sender.clone())
+        async with receiver:
+            yield receiver
+
+
+async def _acollectiter_pipe(
+    coro: Awaitable[Iterable[T]], sender: MemoryObjectSendStream[T]
 ) -> None:
     async with sender:
-        value = await func()
-        await sender.send(value)
+        values = await coro
+        for v in values:
+            await sender.send(v)
 
 
 @attr.define

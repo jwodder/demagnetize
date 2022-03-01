@@ -115,12 +115,11 @@ class PeerConnection(AsyncResource):
         await self.socket.send(bytes(msg))
 
     async def read(self, length: int) -> bytes:
-        while True:
-            self.buff += await self.socket.receive(length)
-            if len(self.buff) >= length:
-                r = self.buff[:length]
-                self.buff = self.buff[length:]
-                return r
+        while len(self.buff) < length:
+            self.buff += await self.socket.receive()
+        r = self.buff[:length]
+        self.buff = self.buff[length:]
+        return r
 
     async def handshake(self) -> None:
         log.log(TRACE, "Sending handshake to %s", self.peer)

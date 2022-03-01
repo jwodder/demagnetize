@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, ClassVar, List
 from anyio.abc import AsyncResource
 import attr
 from yarl import URL
-from ..errors import TrackerError
 from ..peer import Peer
 from ..util import InfoHash, log
 
@@ -24,17 +23,11 @@ class Tracker(ABC):
 
     @classmethod
     def from_url(cls, url: str) -> Tracker:
-        try:
-            u = URL(url)
-        except ValueError:
-            raise TrackerError("Invalid tracker URL")
+        u = URL(url)  # Raises ValueError on failure
         for klass in Tracker.__subclasses__():
             if u.scheme in klass.SCHEMES:
-                try:
-                    return klass(url=u)  # type: ignore[abstract]
-                except ValueError as e:
-                    raise TrackerError(f"Invalid tracker URL: {e}")
-        raise TrackerError(f"Unsupported tracker URL scheme {u.scheme!r}")
+                return klass(url=u)  # type: ignore[abstract]
+        raise ValueError(f"Unsupported tracker URL scheme {u.scheme!r}")
 
     async def get_peers(self, app: Demagnetizer, info_hash: InfoHash) -> List[Peer]:
         log.info("Requesting peers for %s from %s", info_hash, self)

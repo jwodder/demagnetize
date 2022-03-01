@@ -1,7 +1,6 @@
-from functools import partial
 from random import randint
 from time import time
-from typing import Awaitable, Callable, List, Union
+from typing import Awaitable, List, Union
 import attr
 import click
 from torf import Magnet, Torrent
@@ -37,7 +36,7 @@ class Demagnetizer:
     async def download_torrent_info(
         self, magnets: List[Union[str, Magnet]], fntemplate: str
     ) -> Report:
-        funcs: List[Callable[[], Awaitable[Report]]] = []
+        coros: List[Awaitable[Report]] = []
         for m in magnets:
             if not isinstance(m, Magnet):
                 try:
@@ -45,10 +44,10 @@ class Demagnetizer:
                 except ValueError:
                     log.error("Invalid magnet URL: %s", m)
                     continue
-            funcs.append(partial(self.demagnetize2file, m, fntemplate))
+            coros.append(self.demagnetize2file(m, fntemplate))
         report = Report()
-        if funcs:
-            async with acollect(funcs) as ait:
+        if coros:
+            async with acollect(coros) as ait:
                 async for r in ait:
                     report += r
         return report
