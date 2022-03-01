@@ -51,7 +51,7 @@ class TorrentSession:
                     md = await info_receiver.receive()
                 except EndOfStream:
                     raise DemagnetizeFailure(
-                        f"Could not fetch info for info hash {self.info_hash}"
+                        f"Failed to fetch info for {self.info_hash}"
                     )
             tg.cancel_scope.cancel()
             return md
@@ -88,15 +88,18 @@ class TorrentSession:
             info_piecer = InfoPiecer()
             async for peer in pait:
                 try:
-                    n = await peer.get_info(self.app, self.info_hash, info_piecer)
+                    await peer.get_info(self.app, self.info_hash, info_piecer)
                 except PeerError as e:
                     log.warning(
                         "Error getting info for %s from %s: %s", self.info_hash, peer, e
                     )
-                    continue
-                log.debug("Got %d info pieces from %s", n, peer)
+                log.info(
+                    "Got %d info pieces from %s",
+                    info_piecer.peer_contributions(peer),
+                    peer,
+                )
                 if info_piecer.done:
-                    log.debug("All info pieces received")
+                    log.info("All info pieces received")
                     blob = info_piecer.whole
                     ### TODO: Validate against info_hash
                     md = unbencode(blob)

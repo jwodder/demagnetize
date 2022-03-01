@@ -1,11 +1,13 @@
 from __future__ import annotations
 from base64 import b32decode
+from collections import Counter
 from contextlib import asynccontextmanager
 import logging
 from random import choices, randrange
 import re
 from string import ascii_letters, digits
 from typing import (
+    TYPE_CHECKING,
     AsyncIterator,
     Awaitable,
     Generic,
@@ -23,6 +25,9 @@ import attr
 from torf import Magnet, Torrent
 from .consts import INFO_CHUNK_SIZE, PEER_ID_PREFIX
 from .errors import CellClosedError
+
+if TYPE_CHECKING:
+    from .peer import Peer, PeerAddress
 
 log = logging.getLogger(__package__)
 
@@ -207,6 +212,7 @@ class AsyncCell(Generic[T]):
 class InfoPiecer:
     size: Optional[int] = None
     pieces: List[Optional[bytes]] = attr.Factory(list)
+    contributions: Counter[PeerAddress] = attr.Factory(Counter)
 
     def set_size(self, size: int) -> None:
         if self.size is None:
@@ -216,7 +222,7 @@ class InfoPiecer:
         elif self.size != size:
             raise ValueError(f"Got conflicting info sizes: {self.size} vs. {size}")
 
-    def set_piece(self, index: int, blob: bytes) -> None:
+    def set_piece(self, peer: Peer, index: int, blob: bytes) -> None:
         ### TODO: Check that the piece isn't already set?
         if self.size is None:
             raise RuntimeError("set_piece() called before set_size()")
@@ -230,6 +236,7 @@ class InfoPiecer:
                 f" got {len(blob)}"
             )
         self.pieces[index] = blob
+        self.contributions[peer.address] += 1
 
     def needed(self) -> List[int]:
         return [i for i, p in enumerate(self.pieces) if p is None]
@@ -250,3 +257,6 @@ class InfoPiecer:
     @property
     def piece_qty(self) -> int:
         return len(self.pieces)
+
+    def peer_contributions(self, peer: Peer) -> int:
+        return self.contributions[peer.address]

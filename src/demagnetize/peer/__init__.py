@@ -1,3 +1,3 @@
-from .core import Peer
+from .core import Peer, PeerAddress
 
-__all__ = ["Peer"]
+__all__ = ["Peer", "PeerAddress"]

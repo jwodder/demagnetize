@@ -1,7 +1,7 @@
 from __future__ import annotations
 from contextlib import asynccontextmanager
 import sys
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Set, Tuple
 from anyio import (
     EndOfStream,
     connect_tcp,
@@ -45,6 +45,8 @@ SUPPORTED_EXTENSIONS = {Extension.BEP10_EXTENSIONS, Extension.FAST}
 BEP10_EXTENSIONS = BEP10Registry()
 BEP10_EXTENSIONS.register(BEP10Extension.METADATA, UT_METADATA)
 
+PeerAddress = Tuple[str, int]
+
 
 @attr.define
 class Peer:
@@ -59,6 +61,10 @@ class Peer:
             addr = f"{self.host}:{self.port}"
         return f"<Peer {addr}>"
 
+    @property
+    def address(self) -> PeerAddress:
+        return (self.host, self.port)
+
     def for_json(self) -> Dict[str, Any]:
         pid: Optional[str]
         if self.id is not None:
@@ -69,12 +75,12 @@ class Peer:
 
     async def get_info(
         self, app: Demagnetizer, info_hash: InfoHash, info_piecer: InfoPiecer
-    ) -> int:
+    ) -> None:
         # Returns number of pieces received
         log.info("Requesting info for %s from %s", info_hash, self)
         try:
             async with self.connect(app, info_hash) as connpeer:
-                return await connpeer.get_info(info_piecer)
+                await connpeer.get_info(info_piecer)
         except OSError as e:
             raise PeerError(f"Error communicating with {self}: {type(e).__name__}: {e}")
 
@@ -107,6 +113,8 @@ class PeerConnection(AsyncResource):
     subscribers: List[Subscriber] = attr.Factory(list)
 
     async def aclose(self) -> None:
+        for s in self.subscribers:
+            await s.aclose()
         self.task_group.cancel_scope.cancel()
         await self.socket.aclose()
 
@@ -116,7 +124,10 @@ class PeerConnection(AsyncResource):
 
     async def read(self, length: int) -> bytes:
         while len(self.buff) < length:
-            self.buff += await self.socket.receive()
+            try:
+                self.buff += await self.socket.receive()
+            except EndOfStream:
+                raise PeerError(f"{self.peer} closed the connection early")
         r = self.buff[:length]
         self.buff = self.buff[length:]
         return r
@@ -185,23 +196,16 @@ class PeerConnection(AsyncResource):
             yield msg
 
     async def handle_messages(self) -> None:
-        try:
-            async with aclosing(self.aiter_messages()) as ait:
-                async for msg in ait:
-                    log.debug("%s sent message: %s", self.peer, msg)
-                    notified = False
-                    for s in list(self.subscribers):
-                        if s.match(msg):
-                            await s.notify(msg)
-                            notified = True
-                    if not notified:
-                        log.warning("%s sent unexpected message: %s", self.peer, msg)
-                        return
-        except EndOfStream:
-            log.warning("%s closed the connection early", self.peer)
-        finally:
-            for s in self.subscribers:
-                await s.aclose()
+        async with aclosing(self.aiter_messages()) as ait:
+            async for msg in ait:
+                log.debug("%s sent message: %s", self.peer, msg)
+                notified = False
+                for s in list(self.subscribers):
+                    if s.match(msg):
+                        await s.notify(msg)
+                        notified = True
+                if not notified:
+                    raise PeerError(f"{self.peer} sent unexpected message: {msg}")
 
     async def send_keepalives(self) -> None:
         while True:
@@ -209,8 +213,7 @@ class PeerConnection(AsyncResource):
             log.log(TRACE, "Sending keepalive to %s", self.peer)
             await self.socket.send(b"\0\0\0\0")
 
-    async def get_info(self, info_piecer: InfoPiecer) -> int:
-        # Returns number of pieces received
+    async def get_info(self, info_piecer: InfoPiecer) -> None:
         try:
             ### TODO: Put a timeout on this:
             handshake = await self.bep10_handshake.get()
@@ -232,86 +235,82 @@ class PeerConnection(AsyncResource):
                 f"Info size reported by {self.peer} conflicts with previous"
                 f" information: {e}"
             )
-        pieces_received = 0
         sender, receiver = create_memory_object_stream(0, Extended)
-        try:
-            async with sender, receiver:
-                channeller = ExtendedMessageChanneller(UT_METADATA, sender)
-                with additem(self.subscribers, channeller):
-                    for i in info_piecer.needed():
-                        log.debug(
-                            "Sending request to %s for info piece %d/%d",
-                            self.peer,
-                            i,
-                            info_piecer.piece_qty,
+        async with sender, receiver:
+            channeller = ExtendedMessageChanneller(UT_METADATA, sender)
+            with additem(self.subscribers, channeller):
+                for i in info_piecer.needed():
+                    log.debug(
+                        "Sending request to %s for info piece %d/%d",
+                        self.peer,
+                        i,
+                        info_piecer.piece_qty,
+                    )
+                    md_msg = BEP9Message(msg_type=BEP9MsgType.REQUEST, piece=i)
+                    await self.send(
+                        md_msg.compose(
+                            handshake.extensions.to_code[BEP10Extension.METADATA]
                         )
-                        md_msg = BEP9Message(msg_type=BEP9MsgType.REQUEST, piece=i)
-                        await self.send(
-                            md_msg.compose(
-                                handshake.extensions.to_code[BEP10Extension.METADATA]
+                    )
+                    async for msg in receiver:
+                        try:
+                            bm = BEP9Message.parse(msg.payload)
+                        except UnknownBEP9MsgType as e:
+                            log.debug(
+                                "%s sent ut_metadata message with unknown"
+                                " msg_type %d; ignoring",
+                                self.peer,
+                                e.msg_type,
                             )
-                        )
-                        async for msg in receiver:
+                            continue
+                        except ValueError as e:
+                            raise PeerError(
+                                f"received invalid ut_metadata message: {e}"
+                            )
+                        if bm.msg_type is BEP9MsgType.DATA:
+                            if bm.piece != i:
+                                raise PeerError(
+                                    "received data for info piece"
+                                    f" {bm.piece}, which we did not request"
+                                )
+                            elif (
+                                bm.total_size is not None
+                                and bm.total_size != info_piecer.size
+                            ):
+                                raise PeerError(
+                                    "'total_size' in info data message"
+                                    f" ({bm.total_size}) differs from"
+                                    f" previous value ({info_piecer.size})"
+                                )
                             try:
-                                bm = BEP9Message.parse(msg.payload)
-                            except UnknownBEP9MsgType as e:
-                                log.debug(
-                                    "%s sent ut_metadata message with unknown"
-                                    " msg_type %d; ignoring",
-                                    self.peer,
-                                    e.msg_type,
-                                )
+                                info_piecer.set_piece(self.peer, bm.piece, bm.payload)
                             except ValueError as e:
+                                raise PeerError(f"bad info piece: {e}")
+                            break
+                        elif bm.msg_type is BEP9MsgType.REJECT:
+                            if bm.piece != i:
                                 raise PeerError(
-                                    f"received invalid ut_metadata message: {e}"
+                                    "received reject for info piece"
+                                    f" {bm.piece}, which we did not request"
                                 )
-                            if bm.msg_type is BEP9MsgType.DATA:
-                                if bm.piece != i:
-                                    raise PeerError(
-                                        f"received data for piece {bm.piece},"
-                                        " which we did not request"
-                                    )
-                                elif (
-                                    bm.total_size is not None
-                                    and bm.total_size != info_piecer.size
-                                ):
-                                    raise PeerError(
-                                        "'total_size' in data message"
-                                        f" ({bm.total_size}) differs from"
-                                        f" previous value ({info_piecer.size})"
-                                    )
-                                try:
-                                    info_piecer.set_piece(bm.piece, bm.payload)
-                                except ValueError as e:
-                                    raise PeerError(f"bad info piece: {e}")
-                                pieces_received += 1
-                                break
-                            elif bm.msg_type is BEP9MsgType.REJECT:
-                                if bm.piece != i:
-                                    raise PeerError(
-                                        f"received reject for piece {bm.piece},"
-                                        " which we did not request"
-                                    )
-                                log.debug(
-                                    "%s rejected request for info piece %d",
-                                    self.peer,
-                                    bm.piece,
-                                )
-                            elif bm.msg_type is BEP9MsgType.REQUEST:
-                                log.debug(
-                                    "%s sent request for info piece %d; rejecting",
-                                    self.peer,
-                                    bm.piece,
-                                )
-                                md_msg = BEP9Message(
-                                    msg_type=BEP9MsgType.REJECT, piece=bm.piece
-                                )
-                                await self.send(md_msg.compose(UT_METADATA))
-                            else:
-                                raise PeerError(
-                                    f"received ut_metadata message with"
-                                    f" unexpected msg_type {bm.msg_type.name!r}"
-                                )
-        except PeerError as e:
-            log.warning("Error communicating with %s: %s", self.peer, e)
-        return pieces_received
+                            log.debug(
+                                "%s rejected request for info piece %d",
+                                self.peer,
+                                bm.piece,
+                            )
+                        elif bm.msg_type is BEP9MsgType.REQUEST:
+                            log.debug(
+                                "%s sent request for info piece %d; rejecting",
+                                self.peer,
+                                bm.piece,
+                            )
+                            md_msg = BEP9Message(
+                                msg_type=BEP9MsgType.REJECT, piece=bm.piece
+                            )
+                            await self.send(md_msg.compose(UT_METADATA))
+                        else:
+                            ### TODO: Do nothing?  Debug-log?
+                            raise PeerError(
+                                "received ut_metadata message with"
+                                f" unexpected msg_type {bm.msg_type.name!r}"
+                            )
