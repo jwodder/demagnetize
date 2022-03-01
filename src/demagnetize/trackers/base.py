@@ -3,9 +3,12 @@ from abc import ABC, abstractmethod
 from ipaddress import AddressValueError, IPv4Address, IPv6Address
 import struct
 from typing import TYPE_CHECKING, ClassVar, List
+from anyio import fail_after
 from anyio.abc import AsyncResource
 import attr
 from yarl import URL
+from ..consts import TRACKER_TIMEOUT
+from ..errors import TrackerError
 from ..peer import Peer
 from ..util import InfoHash, log
 
@@ -31,8 +34,12 @@ class Tracker(ABC):
 
     async def get_peers(self, app: Demagnetizer, info_hash: InfoHash) -> List[Peer]:
         log.info("Requesting peers for %s from %s", info_hash, self)
-        async with await self.connect(app) as conn:
-            return await conn.announce(info_hash)
+        try:
+            with fail_after(TRACKER_TIMEOUT):
+                async with await self.connect(app) as conn:
+                    return await conn.announce(info_hash)
+        except TimeoutError:
+            raise TrackerError("Tracker did not respond in time")
 
     @abstractmethod
     async def connect(self, app: Demagnetizer) -> TrackerSession:
