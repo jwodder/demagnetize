@@ -236,9 +236,7 @@ class PeerConnection(AsyncResource):
         sender, receiver = create_memory_object_stream(0, Extended)
         try:
             async with sender, receiver:
-                channeller = ExtendedMessageChanneller(
-                    handshake.extensions.to_code[BEP10Extension.METADATA], sender
-                )
+                channeller = ExtendedMessageChanneller(UT_METADATA, sender)
                 with additem(self.subscribers, channeller):
                     for i in info_piecer.needed():
                         log.debug(
@@ -248,7 +246,11 @@ class PeerConnection(AsyncResource):
                             info_piecer.piece_qty,
                         )
                         md_msg = BEP9Message(msg_type=BEP9MsgType.REQUEST, piece=i)
-                        await self.send(md_msg.compose(UT_METADATA))
+                        await self.send(
+                            md_msg.compose(
+                                handshake.extensions.to_code[BEP10Extension.METADATA]
+                            )
+                        )
                         async for msg in receiver:
                             try:
                                 bm = BEP9Message.parse(msg.payload)
