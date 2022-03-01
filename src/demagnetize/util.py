@@ -229,3 +229,7 @@ class InfoPiecer:
                 raise ValueError("Not all pieces retrieved")
             blob += p
         return blob
+
+    @property
+    def piece_qty(self) -> int:
+        return len(self.pieces)

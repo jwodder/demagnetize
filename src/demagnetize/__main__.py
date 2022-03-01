@@ -1,11 +1,13 @@
 import json
 import logging
+from pathlib import Path
 from typing import Optional, TextIO
 import anyio
 import click
 from click_loglevel import LogLevel
 from torf import Magnet
 from .core import Demagnetizer
+from .peer import Peer
 from .util import TRACE, InfoHash, log, yield_lines
 
 
@@ -77,6 +79,19 @@ def get_peers(tracker: str, infohash: InfoHash) -> None:
     peers = anyio.run(demagnetizer.get_peers, tracker, infohash)
     for p in peers:
         print(json.dumps(p.for_json()))
+
+
+@main.command()
+@click.argument("host")
+@click.argument("port", type=int)
+@click.argument("infohash", type=InfoHash.from_string)
+def get_info_from_peer(host: str, port: int, infohash: InfoHash) -> None:
+    demagnetizer = Demagnetizer()
+    peer = Peer(host=host, port=port)
+    info = anyio.run(demagnetizer.get_info_from_peer, peer, infohash)
+    p = Path(f"{infohash}.bencode")
+    log.info("Saving info to %s", p)
+    p.write_bytes(info)
 
 
 if __name__ == "__main__":

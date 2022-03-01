@@ -244,7 +244,7 @@ class PeerConnection(AsyncResource):
                             "Sending request to %s for info piece %d/%d",
                             self.peer,
                             i,
-                            len(info_piecer.pieces),
+                            info_piecer.piece_qty,
                         )
                         md_msg = BEP9Message(msg_type=BEP9MsgType.REQUEST, piece=i)
                         await self.send(md_msg.compose(UT_METADATA))

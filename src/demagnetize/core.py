@@ -13,6 +13,7 @@ from .trackers import Tracker
 from .util import (
     TRACE,
     InfoHash,
+    InfoPiecer,
     Key,
     Report,
     acollect,
@@ -78,6 +79,16 @@ class Demagnetizer:
     async def get_peers(self, tracker_url: str, info_hash: InfoHash) -> List[Peer]:
         tracker = Tracker.from_url(tracker_url)
         return await tracker.get_peers(self, info_hash)
+
+    async def get_info_from_peer(self, peer: Peer, info_hash: InfoHash) -> bytes:
+        info_piecer = InfoPiecer()
+        n = await peer.get_info(self, info_hash, info_piecer)
+        if info_piecer.done:
+            return info_piecer.whole
+        else:
+            raise DemagnetizeFailure(
+                f"Only received {n}/{info_piecer.piece_qty} pieces from peer"
+            )
 
     def open_session(self, magnet: Magnet) -> TorrentSession:
         return TorrentSession(app=self, magnet=magnet)
