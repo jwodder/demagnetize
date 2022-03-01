@@ -8,7 +8,7 @@ import attr
 from yarl import URL
 from ..errors import TrackerError
 from ..peer import Peer
-from ..util import InfoHash
+from ..util import InfoHash, log
 
 if TYPE_CHECKING:
     from ..core import Demagnetizer
@@ -37,6 +37,7 @@ class Tracker(ABC):
         raise TrackerError(f"Unsupported tracker URL scheme {u.scheme!r}")
 
     async def get_peers(self, app: Demagnetizer, info_hash: InfoHash) -> List[Peer]:
+        log.info("Requesting peers for %s from %s", info_hash, self)
         async with await self.connect(app) as conn:
             return await conn.announce(info_hash)
 

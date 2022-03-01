@@ -1,6 +1,5 @@
 from __future__ import annotations
 from base64 import b32decode
-from binascii import unhexlify
 from contextlib import asynccontextmanager
 import logging
 from random import choices, randrange
@@ -10,18 +9,21 @@ from typing import (
     AsyncIterator,
     Awaitable,
     Callable,
+    Generic,
     Iterable,
     Iterator,
     List,
     Optional,
     Tuple,
     TypeVar,
+    cast,
 )
-from anyio import create_memory_object_stream, create_task_group
+from anyio import Event, create_memory_object_stream, create_task_group
 from anyio.streams.memory import MemoryObjectSendStream
 import attr
 from torf import Magnet, Torrent
-from .consts import PEER_ID_PREFIX
+from .consts import INFO_CHUNK_SIZE, PEER_ID_PREFIX
+from .errors import CellClosedError
 
 log = logging.getLogger(__package__)
 
@@ -32,18 +34,24 @@ T = TypeVar("T")
 
 @attr.define
 class InfoHash:
-    as_str: str
+    as_str: str = attr.field(eq=False)
     as_bytes: bytes
 
     @classmethod
     def from_string(cls, s: str) -> InfoHash:
         if len(s) == 40:
-            b = unhexlify(s)
+            b = bytes.fromhex(s)
         elif len(s) == 32:
             b = b32decode(s)
         else:
             raise ValueError(f"Invalid info hash: {s!r}")
         return cls(as_str=s, as_bytes=b)
+
+    @classmethod
+    def from_bytes(cls, b: bytes) -> InfoHash:
+        if len(b) != 20:
+            raise ValueError(f"Invalid info hash: {b!r}")
+        return cls(as_str=b.hex(), as_bytes=b)
 
     def __str__(self) -> str:
         return self.as_str
@@ -151,3 +159,73 @@ async def _acollect_pipe(
     async with sender:
         value = await func()
         await sender.send(value)
+
+
+@attr.define
+class AsyncCell(Generic[T]):
+    event: Event = attr.Factory(Event)
+    value: Optional[T] = None
+    failed: bool = False
+
+    def set(self, value: T) -> None:
+        if self.event.is_set():
+            raise RuntimeError("AsyncCell set more than once")
+        self.value = value
+        self.event.set()
+
+    async def get(self) -> T:
+        await self.event.wait()
+        if self.failed:
+            raise CellClosedError()
+        else:
+            return cast(T, self.value)
+
+    def close(self) -> None:
+        if not self.event.is_set():
+            self.failed = True
+            self.event.set()
+
+
+@attr.define
+class InfoPiecer:
+    size: Optional[int] = None
+    pieces: List[Optional[bytes]] = attr.Factory(list)
+
+    def set_size(self, size: int) -> None:
+        if self.size is None:
+            self.size = size
+            qty = (size + INFO_CHUNK_SIZE - 1) // INFO_CHUNK_SIZE
+            self.pieces = [None] * qty
+        elif self.size != size:
+            raise ValueError(f"Got conflicting info sizes: {self.size} vs. {size}")
+
+    def set_piece(self, index: int, blob: bytes) -> None:
+        ### TODO: Check that the piece isn't already set?
+        if self.size is None:
+            raise RuntimeError("set_piece() called before set_size()")
+        if index == len(self.pieces) - 1 and (mod := self.size % INFO_CHUNK_SIZE):
+            expected_len = mod
+        else:
+            expected_len = INFO_CHUNK_SIZE
+        if len(blob) != expected_len:
+            raise ValueError(
+                f"Piece {index} is wrong length: expected {expected_len} bytes,"
+                f" got {len(blob)}"
+            )
+        self.pieces[index] = blob
+
+    def needed(self) -> List[int]:
+        return [i for i, p in enumerate(self.pieces) if p is None]
+
+    @property
+    def done(self) -> bool:
+        return self.size is not None and all(p is not None for p in self.pieces)
+
+    @property
+    def whole(self) -> bytes:
+        blob = b""
+        for p in self.pieces:
+            if p is None:
+                raise ValueError("Not all pieces retrieved")
+            blob += p
+        return blob

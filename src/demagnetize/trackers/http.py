@@ -37,7 +37,6 @@ class HTTPTrackerSession(TrackerSession):
         await self.client.aclose()
 
     async def announce(self, info_hash: InfoHash) -> List[Peer]:
-        log.info("Requesting peers for %s from %s", info_hash, self.tracker)
         # As of v0.22.0, the only way to send a bytes query parameter through
         # httpx is if we do all of the encoding ourselves.
         params = (

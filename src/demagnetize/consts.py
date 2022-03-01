@@ -10,3 +10,13 @@ LEFT = 65535
 # TODO: Look into appropriate values (For comparison, Transmission uses 2^63-1)
 
 NUMWANT = 50
+
+UT_METADATA = 42
+
+MAX_PEER_MSG_LEN = 65535
+
+MAX_REQUEST_LENGTH = 1 << 14
+
+KEEPALIVE_PERIOD = 120
+
+INFO_CHUNK_SIZE = 16 << 10

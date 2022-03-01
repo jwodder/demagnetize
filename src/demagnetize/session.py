@@ -1,14 +1,14 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from anyio import EndOfStream, create_memory_object_stream, create_task_group
-from anyio.abc import TaskGroup
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 import attr
 from torf import Magnet
-from .errors import DemagnetizeFailure, Error
+from .bencode import unbencode
+from .errors import DemagnetizeFailure, Error, PeerError
 from .peer import Peer
 from .trackers import Tracker
-from .util import InfoHash, log
+from .util import InfoHash, InfoPiecer, log
 
 if TYPE_CHECKING:
     from .core import Demagnetizer
@@ -46,7 +46,7 @@ class TorrentSession:
                         peer_sender.clone(),
                     )
             info_sender, info_receiver = create_memory_object_stream(0, item_type=dict)
-            tg.start_soon(self.pipe_peers, tg, peer_receiver, info_sender)
+            tg.start_soon(self.pipe_peers, peer_receiver, info_sender)
             async with info_receiver:
                 try:
                     md = await info_receiver.receive()
@@ -76,24 +76,25 @@ class TorrentSession:
 
     async def pipe_peers(
         self,
-        task_group: TaskGroup,
         peer_receiver: MemoryObjectReceiveStream[Peer],
         info_sender: MemoryObjectSendStream[dict],
     ) -> None:
         async with peer_receiver, info_sender:
+            info_piecer = InfoPiecer()
             async for peer in peer_receiver:
-                task_group.start_soon(
-                    self.get_info_from_peer, peer, info_sender.clone()
-                )
-
-    async def get_info_from_peer(
-        self, peer: Peer, sender: MemoryObjectSendStream[dict]
-    ) -> None:
-        async with sender:
-            try:
-                md = await peer.get_info(self.info_hash)
-                await sender.send(md)
-            except Error as e:
-                log.warning(
-                    "Error getting info for %s from %s: %s", self.info_hash, peer, e
-                )
+                try:
+                    n = await peer.get_info(self.app, self.info_hash, info_piecer)
+                except PeerError as e:
+                    log.warning(
+                        "Error getting info for %s from %s: %s", self.info_hash, peer, e
+                    )
+                    continue
+                log.debug("Got %d info pieces from %s", n, peer)
+                if info_piecer.done:
+                    log.debug("All info pieces received")
+                    blob = info_piecer.whole
+                    ### TODO: Validate against info_hash
+                    md = unbencode(blob)
+                    ### TODO: Catch decode errors
+                    await info_sender.send(md)
+                    break
