@@ -1,6 +1,6 @@
 from random import randint
 from time import time
-from typing import List
+from typing import AsyncContextManager, AsyncIterable, List
 import attr
 import click
 from torf import Magnet, Torrent
@@ -66,8 +66,15 @@ class Demagnetizer:
         md = await session.get_info()
         return compose_torrent(magnet, md)
 
-    async def get_peers(self, tracker: Tracker, info_hash: InfoHash) -> List[Peer]:
+    async def get_peers_from_tracker(
+        self, tracker: Tracker, info_hash: InfoHash
+    ) -> List[Peer]:
         return await tracker.get_peers(self, info_hash)
+
+    def get_peers_for_magnet(
+        self, magnet: Magnet
+    ) -> AsyncContextManager[AsyncIterable[Peer]]:
+        return self.open_session(magnet).get_all_peers()
 
     async def get_info_from_peer(self, peer: Peer, info_hash: InfoHash) -> bytes:
         info_piecer = InfoPiecer()

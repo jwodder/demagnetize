@@ -86,7 +86,7 @@ def batch(ctx: click.Context, magnetfile: TextIO, outfile: str) -> None:
 @click.argument("infohash", type=InfoHash.from_string)
 def get_peers(tracker: Tracker, infohash: InfoHash) -> None:
     demagnetizer = Demagnetizer()
-    peers = anyio.run(demagnetizer.get_peers, tracker, infohash)
+    peers = anyio.run(demagnetizer.get_peers_from_tracker, tracker, infohash)
     for p in peers:
         print(json.dumps(p.for_json()))
 
@@ -102,6 +102,24 @@ def get_info_from_peer(host: str, port: int, infohash: InfoHash) -> None:
     p = Path(f"{infohash}.bencode")
     log.info("Saving info to %s", p)
     p.write_bytes(info)
+
+
+@main.command()
+@click.argument("magnet", type=Magnet.from_string)
+@click.pass_context
+def get_magnet_peers(ctx: click.Context, magnet: Magnet) -> None:
+    demagnetizer = Demagnetizer()
+
+    async def aprint_magnet_peers() -> bool:
+        ok = False
+        async with demagnetizer.get_peers_for_magnet(magnet) as ait:
+            async for p in ait:
+                ok = True
+                print(json.dumps(p.for_json()))
+        return ok
+
+    if not anyio.run(aprint_magnet_peers):
+        ctx.exit(1)
 
 
 if __name__ == "__main__":
