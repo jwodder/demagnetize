@@ -222,7 +222,9 @@ class PeerConnection(AsyncResource):
             raise PeerError(
                 f"{self.peer} did not report info size in extended handshake"
             )
-        log.debug("%s declares info size as %d bytes", handshake.metadata_size)
+        log.debug(
+            "%s declares info size as %d bytes", self.peer, handshake.metadata_size
+        )
         try:
             info_piecer.set_size(handshake.metadata_size)
         except ValueError as e:
