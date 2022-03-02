@@ -4,7 +4,7 @@ from collections import deque
 from functools import reduce
 from operator import or_
 import struct
-from typing import Any, ClassVar, Dict, Optional, Set
+from typing import Any, ClassVar, Optional
 import attr
 from .extensions import BEP9MsgType, BEP10Registry
 from ..bencode import bencode, partial_unbencode, unbencode
@@ -17,7 +17,7 @@ class Handshake:
     HEADER: ClassVar[bytes] = b"\x13BitTorrent protocol"
     LENGTH: ClassVar[int] = 20 + 8 + 20 + 20
 
-    extensions: Set[int]
+    extensions: set[int]
     info_hash: InfoHash
     peer_id: bytes
 
@@ -391,7 +391,7 @@ class ExtendedHandshake:
         return handshake
 
     def compose(self) -> Extended:
-        data: Dict[bytes, Any] = {b"m": self.extensions.as_dict()}
+        data: dict[bytes, Any] = {b"m": self.extensions.as_dict()}
         if self.v is not None:
             data[b"v"] = self.v.encode("utf-8")
         if self.metadata_size is not None:

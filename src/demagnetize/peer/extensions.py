@@ -1,6 +1,5 @@
 from __future__ import annotations
 from enum import Enum, IntEnum
-from typing import Dict, Set
 import attr
 
 
@@ -29,8 +28,8 @@ class BEP10Extension(Enum):
 
 @attr.define
 class BEP10Registry:
-    from_code: Dict[int, BEP10Extension] = attr.Factory(dict)
-    to_code: Dict[BEP10Extension, int] = attr.Factory(dict)
+    from_code: dict[int, BEP10Extension] = attr.Factory(dict)
+    to_code: dict[BEP10Extension, int] = attr.Factory(dict)
 
     def __contains__(self, ext: BEP10Extension) -> bool:
         return ext in self.to_code
@@ -50,7 +49,7 @@ class BEP10Registry:
         return msg_ids
 
     @property
-    def extensions(self) -> Set[BEP10Extension]:
+    def extensions(self) -> set[BEP10Extension]:
         return set(self.to_code.keys())
 
     def register(self, ext: BEP10Extension, code: int) -> None:
@@ -61,7 +60,7 @@ class BEP10Registry:
         self.from_code[code] = ext
         self.to_code[ext] = code
 
-    def as_dict(self) -> Dict[bytes, int]:
+    def as_dict(self) -> dict[bytes, int]:
         return {k.value.encode("utf-8"): v for k, v in self.to_code.items()}
 
 

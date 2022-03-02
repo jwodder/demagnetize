@@ -5,7 +5,6 @@ from typing import (
     AsyncIterator,
     Awaitable,
     Iterable,
-    List,
 )
 from anyio import EndOfStream, create_memory_object_stream, create_task_group
 from anyio.streams.memory import MemoryObjectSendStream
@@ -57,7 +56,7 @@ class TorrentSession:
             return md
 
     def get_all_peers(self) -> AsyncContextManager[AsyncIterator[Peer]]:
-        coros: List[Awaitable[Iterable[Peer]]] = []
+        coros: list[Awaitable[Iterable[Peer]]] = []
         for url in self.magnet.tr:
             try:
                 tracker = Tracker.from_url(url)
@@ -67,7 +66,7 @@ class TorrentSession:
                 coros.append(self.get_peers_from_tracker(tracker))
         return acollectiter(coros)
 
-    async def get_peers_from_tracker(self, tracker: Tracker) -> List[Peer]:
+    async def get_peers_from_tracker(self, tracker: Tracker) -> list[Peer]:
         try:
             return await tracker.get_peers(self.app, self.info_hash)
         except TrackerError as e:

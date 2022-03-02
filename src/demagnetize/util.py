@@ -13,9 +13,7 @@ from typing import (
     Generic,
     Iterable,
     Iterator,
-    List,
     Optional,
-    Tuple,
     TypeVar,
     cast,
 )
@@ -86,7 +84,7 @@ class Key:
 class Report:
     #: Collection of magnet URLs and the files their torrents were saved to
     #: (None if the demagnetization failed)
-    downloads: List[Tuple[Magnet, Optional[str]]] = attr.Factory(list)
+    downloads: list[tuple[Magnet, Optional[str]]] = attr.Factory(list)
 
     @classmethod
     def for_success(cls, magnet: Magnet, filename: str) -> Report:
@@ -211,7 +209,7 @@ class AsyncCell(Generic[T]):
 @attr.define
 class InfoPiecer:
     size: Optional[int] = None
-    pieces: List[Optional[bytes]] = attr.Factory(list)
+    pieces: list[Optional[bytes]] = attr.Factory(list)
     contributions: Counter[PeerAddress] = attr.Factory(Counter)
 
     def set_size(self, size: int) -> None:
@@ -238,7 +236,7 @@ class InfoPiecer:
         self.pieces[index] = blob
         self.contributions[peer.address] += 1
 
-    def needed(self) -> List[int]:
+    def needed(self) -> list[int]:
         return [i for i, p in enumerate(self.pieces) if p is None]
 
     @property

@@ -1,6 +1,7 @@
+from __future__ import annotations
 from random import randint
 from time import time
-from typing import AsyncContextManager, AsyncIterable, List
+from typing import AsyncContextManager, AsyncIterable
 import attr
 import click
 from torf import Magnet, Torrent
@@ -34,7 +35,7 @@ class Demagnetizer:
         log.log(TRACE, "Using peer port = %d", self.peer_port)
 
     async def download_torrent_info(
-        self, magnets: List[Magnet], fntemplate: str
+        self, magnets: list[Magnet], fntemplate: str
     ) -> Report:
         report = Report()
         coros = [self.demagnetize2file(m, fntemplate) for m in magnets]
@@ -68,7 +69,7 @@ class Demagnetizer:
 
     async def get_peers_from_tracker(
         self, tracker: Tracker, info_hash: InfoHash
-    ) -> List[Peer]:
+    ) -> list[Peer]:
         return await tracker.get_peers(self, info_hash)
 
     def get_peers_for_magnet(

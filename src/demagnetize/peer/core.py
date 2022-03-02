@@ -1,17 +1,7 @@
 from __future__ import annotations
 from contextlib import asynccontextmanager
 import sys
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    AsyncIterator,
-    Dict,
-    List,
-    NoReturn,
-    Optional,
-    Set,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Any, AsyncIterator, NoReturn, Optional, Tuple
 from anyio import (
     EndOfStream,
     IncompleteRead,
@@ -57,7 +47,7 @@ SUPPORTED_EXTENSIONS = {Extension.BEP10_EXTENSIONS, Extension.FAST}
 BEP10_EXTENSIONS = BEP10Registry()
 BEP10_EXTENSIONS.register(BEP10Extension.METADATA, UT_METADATA)
 
-PeerAddress = Tuple[str, int]
+PeerAddress = Tuple[str, int]  # Can't be written as "tuple[str, int]" in 3.8
 
 
 @attr.define
@@ -77,7 +67,7 @@ class Peer:
     def address(self) -> PeerAddress:
         return (self.host, self.port)
 
-    def for_json(self) -> Dict[str, Any]:
+    def for_json(self) -> dict[str, Any]:
         pid: Optional[str]
         if self.id is not None:
             pid = self.id.decode("utf-8", "replace")
@@ -123,9 +113,9 @@ class PeerConnection(AsyncResource):
     socket: SocketStream
     info_hash: InfoHash
     task_group: TaskGroup
-    extensions: Set[Extension] = attr.Factory(set)
+    extensions: set[Extension] = attr.Factory(set)
     bep10_handshake: AsyncCell[ExtendedHandshake] = attr.Factory(AsyncCell)
-    subscribers: List[Subscriber] = attr.Factory(list)
+    subscribers: list[Subscriber] = attr.Factory(list)
     readstream: BufferedByteReceiveStream = attr.field(init=False)
 
     def __attrs_post_init__(self) -> None:
@@ -165,7 +155,7 @@ class PeerConnection(AsyncResource):
         except ValueError as e:
             log.log(TRACE, "Bad handshake from %s: %r", self.peer, r)
             self.error(f"Peer sent bad handshake: {e}")
-        extnames: List[str] = []
+        extnames: list[str] = []
         for ext in sorted(hs.extensions):
             try:
                 extnames.append(Extension(ext).name)

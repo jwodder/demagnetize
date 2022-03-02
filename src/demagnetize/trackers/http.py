@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, ClassVar, List, Optional, Type, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Optional, TypeVar, cast
 from urllib.parse import quote
 import attr
 from httpx import AsyncClient, HTTPError
@@ -17,7 +17,7 @@ T = TypeVar("T")
 
 
 class HTTPTracker(Tracker):
-    SCHEMES: ClassVar[List[str]] = ["http", "https"]
+    SCHEMES: ClassVar[list[str]] = ["http", "https"]
 
     async def connect(self, app: Demagnetizer) -> HTTPTrackerSession:
         return HTTPTrackerSession(
@@ -36,7 +36,7 @@ class HTTPTrackerSession(TrackerSession):
     async def aclose(self) -> None:
         await self.client.aclose()
 
-    async def announce(self, info_hash: InfoHash) -> List[Peer]:
+    async def announce(self, info_hash: InfoHash) -> list[Peer]:
         # As of v0.22.0, the only way to send a bytes query parameter through
         # httpx is if we do all of the encoding ourselves.
         params = (
@@ -100,7 +100,7 @@ class Response:
     tracker_id: Optional[bytes] = None
     complete: Optional[int] = None
     incomplete: Optional[int] = None
-    peers: List[Peer] = attr.Factory(list)
+    peers: list[Peer] = attr.Factory(list)
 
     @classmethod
     def parse(cls, content: bytes) -> Response:
@@ -159,7 +159,7 @@ class Response:
         return r
 
 
-def get_typed_value(data: dict, key: Any, klass: Type[T]) -> Optional[T]:
+def get_typed_value(data: dict, key: Any, klass: type[T]) -> Optional[T]:
     value = data.get(key)
     if isinstance(value, klass):
         return value

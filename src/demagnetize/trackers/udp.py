@@ -12,7 +12,6 @@ from typing import (
     Callable,
     ClassVar,
     ContextManager,
-    List,
     Optional,
     TypeVar,
 )
@@ -35,7 +34,7 @@ PROTOCOL_ID = 0x41727101980
 
 @attr.define
 class UDPTracker(Tracker):
-    SCHEMES: ClassVar[List[str]] = ["udp"]
+    SCHEMES: ClassVar[list[str]] = ["udp"]
 
     host: str = attr.field(init=False)
     port: int = attr.field(init=False)
@@ -82,7 +81,7 @@ class UDPTrackerSession(TrackerSession):
     def reset_connection(self) -> None:
         self.connection = None
 
-    async def announce(self, info_hash: InfoHash) -> List[Peer]:
+    async def announce(self, info_hash: InfoHash) -> list[Peer]:
         while True:
             conn = await self.get_connection()
             try:
@@ -194,7 +193,7 @@ class AnnounceResponse:
     interval: int
     leechers: int
     seeders: int
-    peers: List[Peer]
+    peers: list[Peer]
 
 
 def make_transaction_id() -> int:

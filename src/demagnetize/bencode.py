@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Optional, Tuple
+from __future__ import annotations
+from typing import Any, Optional
 import attr
 from .errors import UnbencodeError
 
@@ -46,7 +47,7 @@ class Unbencoder:
             raise UnbencodeError("Short input")
 
     def read_int(self, stop: bytes) -> int:
-        digits: List[bytes] = []
+        digits: list[bytes] = []
         while (d := self.getchar()) != stop:
             if not d.isdigit() and not (d == b"-" and not digits):
                 raise UnbencodeError("Non-digit in integer")
@@ -62,7 +63,7 @@ class Unbencoder:
     def decode_next(self) -> Any:
         c = self.getchar()
         if c == b"d":
-            bdict: Dict[bytes, Any] = {}
+            bdict: dict[bytes, Any] = {}
             prev_key: Optional[bytes] = None
             while self.peek() != b"e":
                 key = self.decode_next()
@@ -99,7 +100,7 @@ def unbencode(blob: bytes) -> Any:
     return value
 
 
-def partial_unbencode(blob: bytes) -> Tuple[Any, bytes]:
+def partial_unbencode(blob: bytes) -> tuple[Any, bytes]:
     decoder = Unbencoder(blob)
     value = decoder.decode_next()
     return (value, decoder.get_trailing())

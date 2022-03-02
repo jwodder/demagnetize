@@ -1,7 +1,8 @@
+from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import List, Optional, TextIO
+from typing import Optional, TextIO
 import anyio
 import click
 from click_loglevel import LogLevel
@@ -58,7 +59,7 @@ def get(ctx: click.Context, magnet: Magnet, outfile: str) -> None:
 @click.pass_context
 def batch(ctx: click.Context, magnetfile: TextIO, outfile: str) -> None:
     """Convert a collection of magnet URLs to .torrent files"""
-    magnets: List[Magnet] = []
+    magnets: list[Magnet] = []
     ok = True
     with magnetfile:
         for line in yield_lines(magnetfile):
