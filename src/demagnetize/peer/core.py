@@ -284,6 +284,7 @@ class PeerConnection(AsyncResource):
                                     f" ({bm.total_size}) differs from"
                                     f" previous value ({info_piecer.size})"
                                 )
+                            log.debug("%s sent info piece %d", self.peer, bm.piece)
                             try:
                                 info_piecer.set_piece(self.peer, bm.piece, bm.payload)
                             except ValueError as e:
