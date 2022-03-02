@@ -276,7 +276,8 @@ class PeerConnection(AsyncResource):
                         try:
                             bm = BEP9Message.parse(msg.payload)
                         except UnknownBEP9MsgType as e:
-                            log.debug(
+                            log.log(
+                                TRACE,
                                 "%s sent ut_metadata message with unknown"
                                 " msg_type %d; ignoring",
                                 self.peer,
@@ -318,7 +319,8 @@ class PeerConnection(AsyncResource):
                                 bm.piece,
                             )
                         elif bm.msg_type is BEP9MsgType.REQUEST:
-                            log.debug(
+                            log.log(
+                                TRACE,
                                 "%s sent request for info piece %d; rejecting",
                                 self.peer,
                                 bm.piece,
