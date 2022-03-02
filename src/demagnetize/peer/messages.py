@@ -25,6 +25,8 @@ class Handshake:
             raise ValueError(
                 f"handshake wrong length; got {len(blob)}, expected {cls.LENGTH}"
             )
+        ### TODO: Use a bytearray here (and a helper function for extracting
+        ### the first n bytes?)
         if blob[: len(cls.HEADER)] != cls.HEADER:
             raise ValueError("handshake had invalid protocol declaration")
         offset = len(cls.HEADER)

@@ -4,12 +4,14 @@ import sys
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Set, Tuple
 from anyio import (
     EndOfStream,
+    IncompleteRead,
     connect_tcp,
     create_memory_object_stream,
     create_task_group,
     sleep,
 )
 from anyio.abc import AsyncResource, SocketStream, TaskGroup
+from anyio.streams.buffered import BufferedByteReceiveStream
 import attr
 from morecontext import additem
 from .extensions import BEP9MsgType, BEP10Extension, BEP10Registry, Extension
@@ -107,15 +109,19 @@ class PeerConnection(AsyncResource):
     socket: SocketStream
     info_hash: InfoHash
     task_group: TaskGroup
-    buff: bytes = b""
     extensions: Set[Extension] = attr.Factory(set)
     bep10_handshake: AsyncCell[ExtendedHandshake] = attr.Factory(AsyncCell)
     subscribers: List[Subscriber] = attr.Factory(list)
+    readstream: BufferedByteReceiveStream = attr.field(init=False)
+
+    def __attrs_post_init__(self) -> None:
+        self.readstream = BufferedByteReceiveStream(self.socket)
 
     async def aclose(self) -> None:
         for s in self.subscribers:
             await s.aclose()
         self.task_group.cancel_scope.cancel()
+        await self.readstream.aclose()
         await self.socket.aclose()
 
     async def send(self, msg: Message) -> None:
@@ -123,14 +129,10 @@ class PeerConnection(AsyncResource):
         await self.socket.send(bytes(msg))
 
     async def read(self, length: int) -> bytes:
-        while len(self.buff) < length:
-            try:
-                self.buff += await self.socket.receive()
-            except EndOfStream:
-                raise PeerError(f"{self.peer} closed the connection early")
-        r = self.buff[:length]
-        self.buff = self.buff[length:]
-        return r
+        try:
+            return await self.readstream.receive_exactly(length)
+        except (EndOfStream, IncompleteRead):
+            raise PeerError(f"{self.peer} closed the connection early")
 
     async def handshake(self) -> None:
         log.log(TRACE, "Sending handshake to %s", self.peer)
