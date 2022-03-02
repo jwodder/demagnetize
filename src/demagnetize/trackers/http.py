@@ -6,7 +6,7 @@ from httpx import AsyncClient, HTTPError
 from .base import Tracker, TrackerSession, unpack_peers, unpack_peers6
 from ..bencode import unbencode
 from ..consts import CLIENT, LEFT, NUMWANT
-from ..errors import TrackerError, UnbencodeError
+from ..errors import TrackerError, TrackerFailure, UnbencodeError
 from ..peer import Peer
 from ..util import TRACE, InfoHash, log
 
@@ -60,19 +60,23 @@ class HTTPTrackerSession(TrackerSession):
             r = await self.client.get(target)
         except (HTTPError, OSError) as e:
             raise TrackerError(
-                f"Error communicating with {self.tracker}: {type(e).__name__}: {e}"
+                tracker=self.tracker,
+                info_hash=info_hash,
+                msg=f"{type(e).__name__}: {e}",
             )
         if r.is_error:
-            raise TrackerError(f"Request to {self.tracker} returned {r.status_code}")
+            raise TrackerError(
+                tracker=self.tracker,
+                info_hash=info_hash,
+                msg=f"Request to tracker returned {r.status_code}",
+            )
         ### TODO: Should we send a "stopped" event to the tracker now?
         log.log(TRACE, "%s replied with: %r", self.tracker, r.content)
         try:
             response = Response.parse(r.content)
         except ValueError as e:
-            raise TrackerError(f"Bad response from {self.tracker}: {e}")
-        if response.failure_reason is not None:
             raise TrackerError(
-                f"Request to {self.tracker} failed: {response.failure_reason}"
+                tracker=self.tracker, info_hash=info_hash, msg=f"Bad response: {e}"
             )
         if response.warning_message is not None:
             log.info(
@@ -90,7 +94,6 @@ class HTTPTrackerSession(TrackerSession):
 
 @attr.define
 class Response:
-    failure_reason: Optional[str] = None
     warning_message: Optional[str] = None
     interval: Optional[int] = None
     min_interval: Optional[int] = None
@@ -111,10 +114,11 @@ class Response:
         r = cls()
         if (failure := data.get(b"failure reason")) is not None:
             if isinstance(failure, bytes):
-                r.failure_reason = failure.decode("utf-8", "replace")
+                failure_reason = failure.decode("utf-8", "replace")
             else:
                 # Do our best to salvage the situation
-                r.failure_reason = str(failure)
+                failure_reason = str(failure)
+            raise TrackerFailure(failure_reason)
         if (warning := get_typed_value(data, b"warning message", bytes)) is not None:
             r.warning_message = warning.decode("utf-8", "replace")
         r.interval = get_typed_value(data, b"interval", int)

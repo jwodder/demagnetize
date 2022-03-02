@@ -8,7 +8,7 @@ from anyio.abc import AsyncResource
 import attr
 from yarl import URL
 from ..consts import TRACKER_TIMEOUT
-from ..errors import TrackerError
+from ..errors import TrackerError, TrackerFailure
 from ..peer import Peer
 from ..util import InfoHash, log
 
@@ -38,8 +38,16 @@ class Tracker(ABC):
             with fail_after(TRACKER_TIMEOUT):
                 async with await self.connect(app) as conn:
                     return await conn.announce(info_hash)
+        except TrackerFailure as e:
+            raise TrackerError(
+                tracker=self,
+                info_hash=info_hash,
+                msg=f"Tracker replied with failure: {e}",
+            )
         except TimeoutError:
-            raise TrackerError("Tracker did not respond in time")
+            raise TrackerError(
+                tracker=self, info_hash=info_hash, msg="Tracker did not respond in time"
+            )
 
     @abstractmethod
     async def connect(self, app: Demagnetizer) -> TrackerSession:

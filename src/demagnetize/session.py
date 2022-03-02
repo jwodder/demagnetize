@@ -75,7 +75,7 @@ class TorrentSession:
                 "Error getting peers for %s from %s: %s",
                 self.info_hash,
                 tracker,
-                e,
+                e.msg,
             )
             return []
 
@@ -91,7 +91,10 @@ class TorrentSession:
                     await peer.get_info(self.app, self.info_hash, info_piecer)
                 except PeerError as e:
                     log.warning(
-                        "Error getting info for %s from %s: %s", self.info_hash, peer, e
+                        "Error getting info for %s from %s: %s",
+                        self.info_hash,
+                        peer,
+                        e.msg,
                     )
                 log.info(
                     "Got %d info pieces from %s",

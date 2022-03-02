@@ -15,14 +15,13 @@ from typing import (
     List,
     Optional,
     TypeVar,
-    Union,
 )
 from anyio import create_connected_udp_socket, fail_after
 from anyio.abc import ConnectedUDPSocket, SocketAttribute
 import attr
 from .base import Tracker, TrackerSession, unpack_peers, unpack_peers6
 from ..consts import LEFT, NUMWANT
-from ..errors import TrackerError
+from ..errors import TrackerFailure
 from ..peer import Peer
 from ..util import TRACE, InfoHash, Key, log
 
@@ -108,7 +107,7 @@ class UDPTrackerSession(TrackerSession):
     async def send_receive(
         self,
         msg: bytes,
-        response_parser: Callable[[bytes], Union[T, ErrorResponse]],
+        response_parser: Callable[[bytes], T],
         expiration: Optional[float] = None,
     ) -> T:
         ctx: ContextManager[Any]
@@ -139,7 +138,10 @@ class UDPTrackerSession(TrackerSession):
                     log.log(TRACE, "%s responded with: %r", self.tracker, resp)
                     try:
                         data = response_parser(resp)
+                    except TrackerFailure:
+                        raise
                     except Exception as e:
+                        ### TODO: Raise an error instead?
                         log.log(
                             TRACE,
                             "Response from %s was invalid, will resend: %s: %s",
@@ -148,10 +150,6 @@ class UDPTrackerSession(TrackerSession):
                             e,
                         )
                         continue
-                    if isinstance(data, ErrorResponse):
-                        raise TrackerError(
-                            f"{self.tracker} replied with error: {data.message}"
-                        )
                     return data
         except TimeoutError:
             raise ConnectionTimeoutError
@@ -192,11 +190,6 @@ class ConnectionTimeoutError(Exception):
 
 
 @attr.define
-class ErrorResponse:
-    message: str
-
-
-@attr.define
 class AnnounceResponse:
     interval: int
     leechers: int
@@ -212,22 +205,17 @@ def build_connection_request(transaction_id: int) -> bytes:
     return struct.pack("!qii", PROTOCOL_ID, 0, transaction_id)
 
 
-def get_error_response(resp: bytes) -> Optional[ErrorResponse]:
+def raise_error_response(resp: bytes) -> None:
     action, _ = struct.unpack_from("!ii", resp)
     ### TODO: Should we ever care about checking the transaction ID?
     if action == 3:
         msg = resp[8:].decode("utf-8", "replace")
-        return ErrorResponse(msg)
-    else:
-        return None
+        raise TrackerFailure(msg)
 
 
-def parse_connection_response(
-    transaction_id: int, resp: bytes
-) -> Union[int, ErrorResponse]:
+def parse_connection_response(transaction_id: int, resp: bytes) -> int:
     # Returns connection ID or error
-    if (er := get_error_response(resp)) is not None:
-        return er
+    raise_error_response(resp)
     action, xaction_id, connection_id = struct.unpack_from("!iiq", resp)
     # Use `struct.unpack_from()` instead of `unpack()` because "Clients ...
     # should not assume packets to be of a certain size"
@@ -266,9 +254,8 @@ def build_announce_request(
 
 def parse_announce_response(
     transaction_id: int, resp: bytes, is_ipv6: bool
-) -> Union[AnnounceResponse, ErrorResponse]:
-    if (er := get_error_response(resp)) is not None:
-        return er
+) -> AnnounceResponse:
+    raise_error_response(resp)
     header = struct.Struct("!iiiii")
     action, xaction_id, interval, leechers, seeders = header.unpack_from(resp)
     if xaction_id != transaction_id:

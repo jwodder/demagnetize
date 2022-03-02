@@ -14,7 +14,6 @@ from .messages import (
     Piece,
     Suggest,
 )
-from ..errors import PeerError
 from ..util import log
 
 if TYPE_CHECKING:
@@ -61,7 +60,7 @@ class ExtendedHandshakeSubscriber(Subscriber):
         try:
             handshake = ExtendedHandshake.parse(msg.payload)
         except ValueError as e:
-            raise PeerError(f"{self.conn.peer} sent invalid extension handshake: {e}")
+            self.conn.error(f"Peer sent invalid extension handshake: {e}")
         if handshake.v is not None:
             log.debug("%s is running %s", self.conn.peer, handshake.v)
         self.conn.bep10_handshake.set(handshake)

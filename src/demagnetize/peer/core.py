@@ -1,7 +1,17 @@
 from __future__ import annotations
 from contextlib import asynccontextmanager
 import sys
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Dict,
+    List,
+    NoReturn,
+    Optional,
+    Set,
+    Tuple,
+)
 from anyio import (
     EndOfStream,
     IncompleteRead,
@@ -84,7 +94,11 @@ class Peer:
             async with self.connect(app, info_hash) as connpeer:
                 await connpeer.get_info(info_piecer)
         except OSError as e:
-            raise PeerError(f"Error communicating with {self}: {type(e).__name__}: {e}")
+            raise PeerError(
+                peer=self,
+                info_hash=info_hash,
+                msg=f"Communication error: {type(e).__name__}: {e}",
+            )
 
     @asynccontextmanager
     async def connect(
@@ -132,7 +146,7 @@ class PeerConnection(AsyncResource):
         try:
             return await self.readstream.receive_exactly(length)
         except (EndOfStream, IncompleteRead):
-            raise PeerError(f"{self.peer} closed the connection early")
+            self.error("Peer closed the connection early")
 
     async def handshake(self) -> None:
         log.log(TRACE, "Sending handshake to %s", self.peer)
@@ -150,7 +164,7 @@ class PeerConnection(AsyncResource):
             hs = Handshake.parse(r)
         except ValueError as e:
             log.log(TRACE, "Bad handshake from %s: %r", self.peer, r)
-            raise PeerError(f"{self.peer} sent bad handshake: {e}")
+            self.error(f"Peer sent bad handshake: {e}")
         extnames: List[str] = []
         for ext in sorted(hs.extensions):
             try:
@@ -164,19 +178,19 @@ class PeerConnection(AsyncResource):
             hs.peer_id.decode("utf-8", "replace"),
         )
         if hs.info_hash != self.info_hash:
-            raise PeerError(
-                f"{self.peer} replied with wrong info hash;"
-                f" got {hs.info_hash}, asked for {self.info_hash}"
-            )
+            self.error(f"Peer replied with wrong info hash (got {hs.info_hash})")
         self.extensions = SUPPORTED_EXTENSIONS & hs.extensions
         if Extension.BEP10_EXTENSIONS in self.extensions:
             self.subscribers.append(ExtendedHandshakeSubscriber(self))
             handshake = ExtendedHandshake(extensions=BEP10_EXTENSIONS, v=CLIENT)
             await self.send(handshake.compose())
         else:
-            raise PeerError(f"{self.peer} does not support BEP 10 extensions")
+            self.error("Peer does not support BEP 10 extensions")
         if Extension.FAST in self.extensions:
             await self.send(HaveNone())
+
+    def error(self, msg: str) -> NoReturn:
+        raise PeerError(peer=self.peer, info_hash=self.info_hash, msg=msg)
 
     def start_tasks(self) -> None:
         self.subscribers.append(MessageSink())
@@ -188,9 +202,9 @@ class PeerConnection(AsyncResource):
             blen = await self.read(4)
             length = int.from_bytes(blen, "big")
             if length > MAX_PEER_MSG_LEN:
-                raise PeerError(
-                    f"{self.peer} tried to send overly large message of"
-                    f" {length} bytes; not trusting"
+                self.error(
+                    f"Peer tried to send overly large message of {length}"
+                    " bytes; not trusting"
                 )
             if length == 0:
                 log.log(TRACE, "%s sent keepalive", self.peer)
@@ -200,20 +214,20 @@ class PeerConnection(AsyncResource):
                 msg = Message.parse(blen + payload)
             except ValueError as e:
                 log.log(TRACE, "Bad message from %s: %r", self.peer, payload)
-                raise PeerError(f"{self.peer} sent invalid message: {e}")
+                self.error(f"Peer sent invalid message: {e}")
             yield msg
 
     async def handle_messages(self) -> None:
         async with aclosing(self.aiter_messages()) as ait:
             async for msg in ait:
-                log.debug("%s sent message: %s", self.peer, msg)
+                log.log(TRACE, "%s sent message: %s", self.peer, msg)
                 notified = False
                 for s in list(self.subscribers):
                     if s.match(msg):
                         await s.notify(msg)
                         notified = True
                 if not notified:
-                    raise PeerError(f"{self.peer} sent unexpected message: {msg}")
+                    self.error(f"Peer sent unexpected message: {msg}")
 
     async def send_keepalives(self) -> None:
         while True:
@@ -226,21 +240,19 @@ class PeerConnection(AsyncResource):
             ### TODO: Put a timeout on this:
             handshake = await self.bep10_handshake.get()
         except CellClosedError:
-            raise PeerError("Abandoned connection")
+            self.error("Abandoned connection")
         if BEP10Extension.METADATA not in handshake.extensions:
-            raise PeerError(f"{self.peer} does not support metadata transfer")
+            self.error("Peer does not support metadata transfer")
         if handshake.metadata_size is None:
-            raise PeerError(
-                f"{self.peer} did not report info size in extended handshake"
-            )
+            self.error("Peer did not report info size in extended handshake")
         log.debug(
             "%s declares info size as %d bytes", self.peer, handshake.metadata_size
         )
         try:
             info_piecer.set_size(handshake.metadata_size)
         except ValueError as e:
-            raise PeerError(
-                f"Info size reported by {self.peer} conflicts with previous"
+            self.error(
+                "Info size reported by peer conflicts with previous"
                 f" information: {e}"
             )
         sender, receiver = create_memory_object_stream(0, Extended)
@@ -272,12 +284,10 @@ class PeerConnection(AsyncResource):
                             )
                             continue
                         except ValueError as e:
-                            raise PeerError(
-                                f"received invalid ut_metadata message: {e}"
-                            )
+                            self.error(f"received invalid ut_metadata message: {e}")
                         if bm.msg_type is BEP9MsgType.DATA:
                             if bm.piece != i:
-                                raise PeerError(
+                                self.error(
                                     "received data for info piece"
                                     f" {bm.piece}, which we did not request"
                                 )
@@ -285,7 +295,7 @@ class PeerConnection(AsyncResource):
                                 bm.total_size is not None
                                 and bm.total_size != info_piecer.size
                             ):
-                                raise PeerError(
+                                self.error(
                                     "'total_size' in info data message"
                                     f" ({bm.total_size}) differs from"
                                     f" previous value ({info_piecer.size})"
@@ -294,11 +304,11 @@ class PeerConnection(AsyncResource):
                             try:
                                 info_piecer.set_piece(self.peer, bm.piece, bm.payload)
                             except ValueError as e:
-                                raise PeerError(f"bad info piece: {e}")
+                                self.error(f"bad info piece: {e}")
                             break
                         elif bm.msg_type is BEP9MsgType.REJECT:
                             if bm.piece != i:
-                                raise PeerError(
+                                self.error(
                                     "received reject for info piece"
                                     f" {bm.piece}, which we did not request"
                                 )
@@ -319,7 +329,7 @@ class PeerConnection(AsyncResource):
                             await self.send(md_msg.compose(UT_METADATA))
                         else:
                             ### TODO: Do nothing?  Debug-log?
-                            raise PeerError(
+                            self.error(
                                 "received ut_metadata message with"
                                 f" unexpected msg_type {bm.msg_type.name!r}"
                             )
