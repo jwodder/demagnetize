@@ -1,36 +1,25 @@
 from __future__ import annotations
-from enum import Enum
-from typing import Dict, Iterable, Set
+from enum import Enum, IntEnum
+from typing import Dict, Set
 import attr
 
 
-class Extension(Enum):
-    AZUREUS_MESSAGING = (0, 0x80)
-    LOCATION_AWARE = (2, 0x08)
-    BEP10_EXTENSIONS = (5, 0x10)
-    DHT = (7, 0x01)
-    XBT_PEX = (7, 0x02)
-    FAST = (7, 0x04)
-    NAT_TRAVERSAL = (7, 0x08)
-    HYBRID_V2 = (7, 0x10)
+def extbit(bytenum: int, mask: int) -> int:
+    for i in range(8):
+        if 1 << i == mask:
+            return i + 8 * (7 - bytenum)
+    raise ValueError("Mask must be a single bit")
 
-    def __init__(self, byte: int, mask: int) -> None:
-        self.byte = byte
-        self.mask = mask
 
-    @staticmethod
-    def compile(extensions: Iterable[Extension]) -> bytes:
-        bs = [0] * 8
-        for ext in extensions:
-            bs[ext.byte] |= ext.mask
-        return bytes(bs)
-
-    @classmethod
-    def decompile(cls, blob: bytes) -> Set[Extension]:
-        return {ext for ext in cls if ext.is_set(blob)}
-
-    def is_set(self, blob: bytes) -> bool:
-        return blob[self.byte] & self.mask == self.mask
+class Extension(IntEnum):
+    AZUREUS_MESSAGING = extbit(0, 0x80)
+    LOCATION_AWARE = extbit(2, 0x08)
+    BEP10_EXTENSIONS = extbit(5, 0x10)
+    DHT = extbit(7, 0x01)
+    XBT_PEX = extbit(7, 0x02)
+    FAST = extbit(7, 0x04)
+    NAT_TRAVERSAL = extbit(7, 0x08)
+    HYBRID_V2 = extbit(7, 0x10)
 
 
 class BEP10Extension(Enum):

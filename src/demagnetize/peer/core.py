@@ -139,7 +139,7 @@ class PeerConnection(AsyncResource):
         await self.socket.send(
             bytes(
                 Handshake(
-                    extensions=SUPPORTED_EXTENSIONS,
+                    extensions=set(SUPPORTED_EXTENSIONS),  # set() for mypy
                     info_hash=self.info_hash,
                     peer_id=self.app.peer_id,
                 )
@@ -151,10 +151,16 @@ class PeerConnection(AsyncResource):
         except ValueError as e:
             log.log(TRACE, "Bad handshake from %s: %r", self.peer, r)
             raise PeerError(f"{self.peer} sent bad handshake: {e}")
+        extnames: List[str] = []
+        for ext in sorted(hs.extensions):
+            try:
+                extnames.append(Extension(ext).name)
+            except ValueError:
+                extnames.append(str(ext))
         log.debug(
             "%s sent handshake: extensions=%s, peer_id=%s",
             self.peer,
-            " | ".join(ext.name for ext in hs.extensions) or "<none>",
+            " | ".join(extnames) or "<none>",
             hs.peer_id.decode("utf-8", "replace"),
         )
         if hs.info_hash != self.info_hash:
@@ -179,8 +185,8 @@ class PeerConnection(AsyncResource):
 
     async def aiter_messages(self) -> AsyncIterator[Message]:
         while True:
-            blob = await self.read(4)
-            length = int.from_bytes(blob, "big")
+            blen = await self.read(4)
+            length = int.from_bytes(blen, "big")
             if length > MAX_PEER_MSG_LEN:
                 raise PeerError(
                     f"{self.peer} tried to send overly large message of"
@@ -189,11 +195,11 @@ class PeerConnection(AsyncResource):
             if length == 0:
                 log.log(TRACE, "%s sent keepalive", self.peer)
             else:
-                blob = await self.read(length)
+                payload = await self.read(length)
             try:
-                msg = Message.parse(blob)
+                msg = Message.parse(blen + payload)
             except ValueError as e:
-                log.log(TRACE, "Bad message from %s: %r", self.peer, blob)
+                log.log(TRACE, "Bad message from %s: %r", self.peer, payload)
                 raise PeerError(f"{self.peer} sent invalid message: {e}")
             yield msg
 

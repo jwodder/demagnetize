@@ -1,10 +1,12 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections import deque
+from functools import reduce
+from operator import or_
 import struct
 from typing import Any, ClassVar, Dict, Optional, Set
 import attr
-from .extensions import BEP9MsgType, BEP10Registry, Extension
+from .extensions import BEP9MsgType, BEP10Registry
 from ..bencode import bencode, partial_unbencode, unbencode
 from ..errors import UnbencodeError, UnknownBEP9MsgType
 from ..util import InfoHash
@@ -15,9 +17,17 @@ class Handshake:
     HEADER: ClassVar[bytes] = b"\x13BitTorrent protocol"
     LENGTH: ClassVar[int] = 20 + 8 + 20 + 20
 
-    extensions: Set[Extension]
+    extensions: Set[int]
     info_hash: InfoHash
     peer_id: bytes
+
+    def __bytes__(self) -> bytes:
+        return (
+            self.HEADER
+            + reduce(or_, [1 << i for i in self.extensions], 0).to_bytes(8, "big")
+            + bytes(self.info_hash)
+            + (self.peer_id + b"\0" * 20)[:20]
+        )
 
     @classmethod
     def parse(cls, blob: bytes) -> Handshake:
@@ -25,25 +35,16 @@ class Handshake:
             raise ValueError(
                 f"handshake wrong length; got {len(blob)}, expected {cls.LENGTH}"
             )
-        ### TODO: Use a bytearray here (and a helper function for extracting
-        ### the first n bytes?)
         if blob[: len(cls.HEADER)] != cls.HEADER:
             raise ValueError("handshake had invalid protocol declaration")
         offset = len(cls.HEADER)
-        extensions = Extension.decompile(blob[offset : offset + 8])
+        exts = int.from_bytes(blob[offset : offset + 8], "big")
+        extensions = {i for i in range(64) if exts & (1 << i)}
         offset += 8
         info_hash = InfoHash.from_bytes(blob[offset : offset + 20])
         offset += 20
         peer_id = blob[offset:]
         return cls(extensions=extensions, info_hash=info_hash, peer_id=peer_id)
-
-    def __bytes__(self) -> bytes:
-        return (
-            self.HEADER
-            + Extension.compile(self.extensions)
-            + bytes(self.info_hash)
-            + (self.peer_id + b"\0" * 20)[:20]
-        )
 
 
 class Message(ABC):
@@ -56,8 +57,9 @@ class Message(ABC):
 
     @classmethod
     def parse(cls, blob: bytes) -> Message:
-        mtype = blob[0]
-        payload = blob[1:]
+        # length = blob[:4]
+        mtype = blob[4]
+        payload = blob[5:]
         klasses = deque(Message.__subclasses__())
         while klasses:
             klass = klasses.popleft()
@@ -78,6 +80,7 @@ class Message(ABC):
         ...
 
 
+@attr.define  # To make the empty messages into useful classes
 class EmptyMessage(Message):
     @classmethod
     def from_payload(cls, _payload: bytes) -> EmptyMessage:
@@ -145,8 +148,7 @@ class Have(Message):
                 f"Invalid length for 'have' payload; expected 4 bytes,"
                 f" got {len(payload)}"
             )
-        index = int.from_bytes(payload, "big")
-        return cls(index=index)
+        return cls(index=int.from_bytes(payload, "big"))
 
     def to_payload(self) -> bytes:
         return self.index.to_bytes(4, "big")
@@ -250,6 +252,27 @@ class Cancel(Message):
 
     def to_payload(self) -> bytes:
         return struct.pack("!III", self.index, self.begin, self.length)
+
+
+@attr.define
+class Port(Message):
+    TYPE: ClassVar[int] = 9
+    port: int
+
+    def __str__(self) -> str:
+        return f"DHT port {self.port}"
+
+    @classmethod
+    def from_payload(cls, payload: bytes) -> Port:
+        if len(payload) != 2:
+            raise ValueError(
+                f"Invalid length for 'port' payload; expected 2 bytes,"
+                f" got {len(payload)}"
+            )
+        return cls(int.from_bytes(payload, "big"))
+
+    def to_payload(self) -> bytes:
+        return self.port.to_bytes(2, "big")
 
 
 @attr.define
