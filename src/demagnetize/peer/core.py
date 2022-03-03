@@ -8,6 +8,7 @@ from anyio import (
     connect_tcp,
     create_memory_object_stream,
     create_task_group,
+    fail_after,
     sleep,
 )
 from anyio.abc import AsyncResource, SocketStream, TaskGroup
@@ -30,7 +31,13 @@ from .subscribers import (
     Subscriber,
 )
 from ..bencode import unbencode
-from ..consts import CLIENT, KEEPALIVE_PERIOD, MAX_PEER_MSG_LEN, UT_METADATA
+from ..consts import (
+    CLIENT,
+    KEEPALIVE_PERIOD,
+    MAX_PEER_MSG_LEN,
+    PEER_CONNECT_TIMEOUT,
+    UT_METADATA,
+)
 from ..errors import CellClosedError, PeerError, UnbencodeError, UnknownBEP9MsgType
 from ..util import TRACE, AsyncCell, InfoHash, InfoPiecer, log
 
@@ -93,7 +100,16 @@ class Peer:
         self, app: Demagnetizer, info_hash: InfoHash
     ) -> AsyncIterator[PeerConnection]:
         log.debug("Connecting to %s", self)
-        async with await connect_tcp(self.host, self.port) as s:
+        try:
+            with fail_after(PEER_CONNECT_TIMEOUT):
+                s = await connect_tcp(self.host, self.port)
+        except TimeoutError:
+            raise PeerError(
+                peer=self,
+                info_hash=info_hash,
+                msg="Could not connect to peer in time",
+            )
+        async with s:
             log.debug("Connected to %s", self)
             async with create_task_group() as tg:
                 async with PeerConnection(
