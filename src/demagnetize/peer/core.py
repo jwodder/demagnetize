@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 import sys
 from typing import TYPE_CHECKING, Any, AsyncIterator, NoReturn, Optional, Tuple
 from anyio import (
+    BrokenResourceError,
     EndOfStream,
     IncompleteRead,
     connect_tcp,
@@ -109,15 +110,19 @@ class Peer:
                 info_hash=info_hash,
                 msg="Could not connect to peer in time",
             )
-        async with s:
-            log.debug("Connected to %s", self)
-            async with create_task_group() as tg:
-                async with PeerConnection(
-                    peer=self, app=app, socket=s, info_hash=info_hash, task_group=tg
-                ) as conn:
-                    await conn.handshake()
-                    conn.start_tasks()
-                    yield conn
+        try:  ###
+            async with s:
+                log.debug("Connected to %s", self)
+                async with create_task_group() as tg:
+                    async with PeerConnection(
+                        peer=self, app=app, socket=s, info_hash=info_hash, task_group=tg
+                    ) as conn:
+                        await conn.handshake()
+                        conn.start_tasks()
+                        yield conn
+        except StopAsyncIteration:  ###
+            log.exception("Unexpected StopAsyncIteration!!!")  ###
+            raise  ###
 
 
 @attr.define
@@ -149,7 +154,7 @@ class PeerConnection(AsyncResource):
     async def read(self, length: int) -> bytes:
         try:
             return await self.readstream.receive_exactly(length)
-        except (EndOfStream, IncompleteRead):
+        except (EndOfStream, IncompleteRead, BrokenResourceError):
             self.error("Peer closed the connection early")
 
     async def handshake(self) -> None:

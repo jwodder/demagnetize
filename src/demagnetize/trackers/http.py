@@ -58,7 +58,7 @@ class HTTPTrackerSession(TrackerSession):
             target = f"{url}?{params}"
         try:
             r = await self.client.get(target)
-        except (HTTPError, OSError) as e:
+        except HTTPError as e:
             raise TrackerError(
                 tracker=self.tracker,
                 info_hash=info_hash,

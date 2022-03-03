@@ -87,7 +87,7 @@ class Demagnetizer:
 
 def compose_torrent(magnet: Magnet, info: dict) -> Torrent:
     torrent = Torrent()
-    torrent.metadata["info"] = info
+    torrent.metainfo["info"] = info
     torrent.trackers = magnet.tr
     torrent.created_by = CLIENT
     torrent.creation_date = time()

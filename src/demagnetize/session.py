@@ -52,7 +52,7 @@ class TorrentSession:
         log.info("Fetching info for info hash %s%s", self.info_hash, display)
         async with create_task_group() as tg:
             info_sender, info_receiver = create_memory_object_stream(0, dict)
-            tg.start_soon(self._peer_pipe, self.get_all_peers(), info_sender)
+            tg.start_soon(self._peer_pipe, self.get_all_peers(), info_sender, tg)
             async with info_receiver:
                 try:
                     md = await info_receiver.receive()

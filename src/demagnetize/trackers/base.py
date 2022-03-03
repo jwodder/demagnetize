@@ -48,6 +48,12 @@ class Tracker(ABC):
             raise TrackerError(
                 tracker=self, info_hash=info_hash, msg="Tracker did not respond in time"
             )
+        except OSError as e:
+            raise TrackerError(
+                tracker=self,
+                info_hash=info_hash,
+                msg=f"Error communicating with tracker: {type(e).__name__}: {e}",
+            )
 
     @abstractmethod
     async def connect(self, app: Demagnetizer) -> TrackerSession:
