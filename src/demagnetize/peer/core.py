@@ -29,8 +29,9 @@ from .subscribers import (
     MessageSink,
     Subscriber,
 )
+from ..bencode import unbencode
 from ..consts import CLIENT, KEEPALIVE_PERIOD, MAX_PEER_MSG_LEN, UT_METADATA
-from ..errors import CellClosedError, PeerError, UnknownBEP9MsgType
+from ..errors import CellClosedError, PeerError, UnbencodeError, UnknownBEP9MsgType
 from ..util import TRACE, AsyncCell, InfoHash, InfoPiecer, log
 
 if sys.version_info >= (3, 10):
@@ -75,14 +76,11 @@ class Peer:
             pid = None
         return {"host": self.host, "port": self.port, "id": pid}
 
-    async def get_info(
-        self, app: Demagnetizer, info_hash: InfoHash, info_piecer: InfoPiecer
-    ) -> None:
-        # Returns number of pieces received
+    async def get_info(self, app: Demagnetizer, info_hash: InfoHash) -> dict:
         log.info("Requesting info for %s from %s", info_hash, self)
         try:
             async with self.connect(app, info_hash) as connpeer:
-                await connpeer.get_info(info_piecer)
+                return await connpeer.get_info()
         except OSError as e:
             raise PeerError(
                 peer=self,
@@ -225,7 +223,11 @@ class PeerConnection(AsyncResource):
             log.log(TRACE, "Sending keepalive to %s", self.peer)
             await self.socket.send(b"\0\0\0\0")
 
-    async def get_info(self, info_piecer: InfoPiecer) -> None:
+    async def get_info(self) -> dict:
+        # Unlike a normal torrent, we expect to get the entire info from a
+        # single peer and error if it can't give it to us (because peers should
+        # only be sending any info if they've checked the whole thing, and if
+        # they can't send it all, why should we trust them?)
         try:
             ### TODO: Put a timeout on this:
             handshake = await self.bep10_handshake.get()
@@ -238,18 +240,12 @@ class PeerConnection(AsyncResource):
         log.debug(
             "%s declares info size as %d bytes", self.peer, handshake.metadata_size
         )
-        try:
-            info_piecer.set_size(handshake.metadata_size)
-        except ValueError as e:
-            self.error(
-                "Info size reported by peer conflicts with previous"
-                f" information: {e}"
-            )
+        info_piecer = InfoPiecer(handshake.metadata_size)
         sender, receiver = create_memory_object_stream(0, Extended)
         async with sender, receiver:
             channeller = ExtendedMessageChanneller(UT_METADATA, sender)
             with additem(self.subscribers, channeller):
-                for i in info_piecer.needed():
+                for i in range(info_piecer.piece_qty):
                     log.debug(
                         "Sending request to %s for info piece %d/%d",
                         self.peer,
@@ -284,16 +280,16 @@ class PeerConnection(AsyncResource):
                                 )
                             elif (
                                 bm.total_size is not None
-                                and bm.total_size != info_piecer.size
+                                and bm.total_size != info_piecer.total_size
                             ):
                                 self.error(
                                     "'total_size' in info data message"
                                     f" ({bm.total_size}) differs from"
-                                    f" previous value ({info_piecer.size})"
+                                    f" previous value ({info_piecer.total_size})"
                                 )
                             log.debug("%s sent info piece %d", self.peer, bm.piece)
                             try:
-                                info_piecer.set_piece(self.peer, bm.piece, bm.payload)
+                                info_piecer.add_piece(bm.payload)
                             except ValueError as e:
                                 self.error(f"bad info piece: {e}")
                             break
@@ -325,3 +321,15 @@ class PeerConnection(AsyncResource):
                                 "received ut_metadata message with"
                                 f" unexpected msg_type {bm.msg_type.name!r}"
                             )
+        log.debug("All info pieces received from %s; validating ...", self.peer)
+        if (good_dgst := self.info_hash.as_hex) != (dgst := info_piecer.get_digest()):
+            self.error(
+                f"Received info with invalid digest; expected {good_dgst}, got {dgst}"
+            )
+        data = info_piecer.get_data()
+        try:
+            info = unbencode(data)
+            assert isinstance(info, dict)
+        except (UnbencodeError, AssertionError):
+            self.error("Received invalid bencoded data as info")
+        return info

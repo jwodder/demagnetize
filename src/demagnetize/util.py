@@ -1,13 +1,13 @@
 from __future__ import annotations
 from base64 import b32decode
-from collections import Counter
 from contextlib import asynccontextmanager
+from hashlib import sha1
 import logging
 from random import choices, randrange
 import re
 from string import ascii_letters, digits
 from typing import (
-    TYPE_CHECKING,
+    Any,
     AsyncIterator,
     Awaitable,
     Generic,
@@ -23,9 +23,6 @@ import attr
 from torf import Magnet, Torrent
 from .consts import INFO_CHUNK_SIZE, PEER_ID_PREFIX
 from .errors import CellClosedError
-
-if TYPE_CHECKING:
-    from .peer import Peer, PeerAddress
 
 log = logging.getLogger(__package__)
 
@@ -60,6 +57,10 @@ class InfoHash:
 
     def __bytes__(self) -> bytes:
         return self.as_bytes
+
+    @property
+    def as_hex(self) -> str:
+        return self.as_bytes.hex()
 
 
 @attr.define
@@ -208,53 +209,37 @@ class AsyncCell(Generic[T]):
 
 @attr.define
 class InfoPiecer:
-    size: Optional[int] = None
-    pieces: list[Optional[bytes]] = attr.Factory(list)
-    contributions: Counter[PeerAddress] = attr.Factory(Counter)
+    total_size: int
+    data: bytearray = attr.Factory(bytearray)
+    sizes: list[int] = attr.field(init=False)
+    index: int = 0
+    digest: Any = attr.Factory(sha1)
 
-    def set_size(self, size: int) -> None:
-        if self.size is None:
-            self.size = size
-            qty = (size + INFO_CHUNK_SIZE - 1) // INFO_CHUNK_SIZE
-            self.pieces = [None] * qty
-        elif self.size != size:
-            raise ValueError(f"Got conflicting info sizes: {self.size} vs. {size}")
-
-    def set_piece(self, peer: Peer, index: int, blob: bytes) -> None:
-        ### TODO: Check that the piece isn't already set?
-        if self.size is None:
-            raise RuntimeError("set_piece() called before set_size()")
-        if index == len(self.pieces) - 1 and (mod := self.size % INFO_CHUNK_SIZE):
-            expected_len = mod
-        else:
-            expected_len = INFO_CHUNK_SIZE
-        if len(blob) != expected_len:
-            raise ValueError(
-                f"Piece {index} is wrong length: expected {expected_len} bytes,"
-                f" got {len(blob)}"
-            )
-        self.pieces[index] = blob
-        self.contributions[peer.address] += 1
-
-    def needed(self) -> list[int]:
-        return [i for i, p in enumerate(self.pieces) if p is None]
-
-    @property
-    def done(self) -> bool:
-        return self.size is not None and all(p is not None for p in self.pieces)
-
-    @property
-    def whole(self) -> bytes:
-        blob = b""
-        for p in self.pieces:
-            if p is None:
-                raise ValueError("Not all pieces retrieved")
-            blob += p
-        return blob
+    def __attrs_post_init__(self) -> None:
+        qty, residue = divmod(self.total_size, INFO_CHUNK_SIZE)
+        self.sizes = [INFO_CHUNK_SIZE] * qty
+        if residue:
+            self.sizes.append(residue)
 
     @property
     def piece_qty(self) -> int:
-        return len(self.pieces)
+        return len(self.sizes)
 
-    def peer_contributions(self, peer: Peer) -> int:
-        return self.contributions[peer.address]
+    def add_piece(self, blob: bytes) -> None:
+        if self.index >= len(self.sizes):
+            raise ValueError("Too many pieces")
+        expected_len = self.sizes[self.index]
+        if len(blob) != expected_len:
+            raise ValueError(
+                f"Piece {self.index} is wrong length: expected {expected_len}"
+                f" bytes, got {len(blob)}"
+            )
+        self.data.extend(blob)
+        self.digest.update(blob)
+        self.index += 1
+
+    def get_data(self) -> bytes:
+        return bytes(self.data)
+
+    def get_digest(self) -> str:
+        return cast(str, self.digest.hexdigest())

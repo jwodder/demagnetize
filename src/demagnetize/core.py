@@ -5,6 +5,7 @@ from typing import AsyncContextManager, AsyncIterable
 import attr
 import click
 from torf import Magnet, Torrent
+from .bencode import bencode
 from .consts import CLIENT
 from .errors import DemagnetizeFailure
 from .peer import Peer
@@ -13,7 +14,6 @@ from .trackers import Tracker
 from .util import (
     TRACE,
     InfoHash,
-    InfoPiecer,
     Key,
     Report,
     acollect,
@@ -78,14 +78,8 @@ class Demagnetizer:
         return self.open_session(magnet).get_all_peers()
 
     async def get_info_from_peer(self, peer: Peer, info_hash: InfoHash) -> bytes:
-        info_piecer = InfoPiecer()
-        n = await peer.get_info(self, info_hash, info_piecer)
-        if info_piecer.done:
-            return info_piecer.whole
-        else:
-            raise DemagnetizeFailure(
-                f"Only received {n}/{info_piecer.piece_qty} pieces from peer"
-            )
+        info = await peer.get_info(self, info_hash)
+        return bencode(info)
 
     def open_session(self, magnet: Magnet) -> TorrentSession:
         return TorrentSession(app=self, magnet=magnet)

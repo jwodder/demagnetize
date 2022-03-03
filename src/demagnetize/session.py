@@ -6,15 +6,21 @@ from typing import (
     Awaitable,
     Iterable,
 )
-from anyio import EndOfStream, create_memory_object_stream, create_task_group
+from anyio import (
+    CapacityLimiter,
+    EndOfStream,
+    create_memory_object_stream,
+    create_task_group,
+)
+from anyio.abc import TaskGroup
 from anyio.streams.memory import MemoryObjectSendStream
 import attr
 from torf import Magnet
-from .bencode import unbencode
+from .consts import PEERS_PER_MAGNET_LIMIT
 from .errors import DemagnetizeFailure, PeerError, TrackerError
 from .peer import Peer
 from .trackers import Tracker
-from .util import InfoHash, InfoPiecer, acollectiter, log
+from .util import InfoHash, acollectiter, log
 
 if TYPE_CHECKING:
     from .core import Demagnetizer
@@ -25,11 +31,13 @@ class TorrentSession:
     app: Demagnetizer
     magnet: Magnet
     info_hash: InfoHash = attr.field(init=False)
+    peer_limit: CapacityLimiter = attr.field(init=False)
 
     def __attrs_post_init__(self) -> None:
         # torf only accepts magnet URLs with valid info hashes, so this
         # shouldn't fail:
         self.info_hash = InfoHash.from_string(self.magnet.infohash)
+        self.peer_limit = CapacityLimiter(PEERS_PER_MAGNET_LIMIT)
 
     async def get_info(self) -> dict:
         if not self.magnet.tr:
@@ -44,7 +52,7 @@ class TorrentSession:
         log.info("Fetching info for info hash %s%s", self.info_hash, display)
         async with create_task_group() as tg:
             info_sender, info_receiver = create_memory_object_stream(0, dict)
-            tg.start_soon(self.pipe_peers, self.get_all_peers(), info_sender)
+            tg.start_soon(self._peer_pipe, self.get_all_peers(), info_sender)
             async with info_receiver:
                 try:
                     md = await info_receiver.receive()
@@ -78,33 +86,29 @@ class TorrentSession:
             )
             return []
 
-    async def pipe_peers(
+    async def _peer_pipe(
         self,
         peer_receiver: AsyncContextManager[AsyncIterator[Peer]],
         info_sender: MemoryObjectSendStream[dict],
+        task_group: TaskGroup,
     ) -> None:
         async with peer_receiver as pait, info_sender:
-            info_piecer = InfoPiecer()
             async for peer in pait:
-                try:
-                    await peer.get_info(self.app, self.info_hash, info_piecer)
-                except PeerError as e:
-                    log.warning(
-                        "Error getting info for %s from %s: %s",
-                        self.info_hash,
-                        peer,
-                        e.msg,
-                    )
-                log.info(
-                    "Got %d info pieces from %s",
-                    info_piecer.peer_contributions(peer),
+                task_group.start_soon(self._peer_task, peer, info_sender.clone())
+
+    async def _peer_task(
+        self, peer: Peer, info_sender: MemoryObjectSendStream[dict]
+    ) -> None:
+        async with self.peer_limit, info_sender:
+            try:
+                info = await peer.get_info(self.app, self.info_hash)
+            except PeerError as e:
+                log.warning(
+                    "Error getting info for %s from %s: %s",
+                    self.info_hash,
                     peer,
+                    e.msg,
                 )
-                if info_piecer.done:
-                    log.info("All info pieces received")
-                    blob = info_piecer.whole
-                    ### TODO: Validate against info_hash
-                    md = unbencode(blob)
-                    ### TODO: Catch decode errors
-                    await info_sender.send(md)
-                    break
+            else:
+                log.info("Received info from %s", peer)
+                await info_sender.send(info)
