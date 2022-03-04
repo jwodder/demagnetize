@@ -17,7 +17,7 @@ from anyio.streams.memory import MemoryObjectSendStream
 import attr
 from torf import Magnet
 from .consts import PEERS_PER_MAGNET_LIMIT
-from .errors import DemagnetizeFailure, PeerError, TrackerError
+from .errors import DemagnetizeError, PeerError, TrackerError
 from .peer import Peer
 from .trackers import Tracker
 from .util import InfoHash, acollectiter, log
@@ -41,7 +41,7 @@ class TorrentSession:
 
     async def get_info(self) -> dict:
         if not self.magnet.tr:
-            raise DemagnetizeFailure(
+            raise DemagnetizeError(
                 f"Cannot fetch info for info hash {self.info_hash}: No trackers"
                 " in magnet URL"
             )
@@ -57,9 +57,7 @@ class TorrentSession:
                 try:
                     md = await info_receiver.receive()
                 except EndOfStream:
-                    raise DemagnetizeFailure(
-                        f"Failed to fetch info for {self.info_hash}"
-                    )
+                    raise DemagnetizeError(f"Failed to fetch info for {self.info_hash}")
             tg.cancel_scope.cancel()
             return md
 

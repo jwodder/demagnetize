@@ -28,7 +28,7 @@ class PeerError(Exception):
         return f"Error communicating with {self.peer} for {self.info_hash}: {self.msg}"
 
 
-class DemagnetizeFailure(Exception):
+class DemagnetizeError(Exception):
     pass
 
 

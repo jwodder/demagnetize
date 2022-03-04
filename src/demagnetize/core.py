@@ -8,7 +8,7 @@ from torf import Magnet, Torrent
 from torf._utils import decode_dict
 from .bencode import bencode
 from .consts import CLIENT
-from .errors import DemagnetizeFailure
+from .errors import DemagnetizeError
 from .peer import Peer
 from .session import TorrentSession
 from .trackers import Tracker
@@ -52,7 +52,7 @@ class Demagnetizer:
             log.info(
                 "Saving torrent for info hash %s to file %s", magnet.infohash, filename
             )
-        except DemagnetizeFailure as e:
+        except DemagnetizeError as e:
             log.error("%s", e)
             return Report.for_failure(magnet)
         try:
