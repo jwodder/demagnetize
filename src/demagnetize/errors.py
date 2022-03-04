@@ -8,12 +8,8 @@ if TYPE_CHECKING:
     from .util import InfoHash
 
 
-class Error(Exception):
-    pass
-
-
 @attr.define
-class TrackerError(Error):
+class TrackerError(Exception):
     tracker: Tracker
     info_hash: InfoHash
     msg: str
@@ -23,7 +19,7 @@ class TrackerError(Error):
 
 
 @attr.define
-class PeerError(Error):
+class PeerError(Exception):
     peer: Peer
     info_hash: InfoHash
     msg: str
@@ -32,7 +28,7 @@ class PeerError(Error):
         return f"Error communicating with {self.peer} for {self.info_hash}: {self.msg}"
 
 
-class DemagnetizeFailure(Error):
+class DemagnetizeFailure(Exception):
     pass
 
 
