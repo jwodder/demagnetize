@@ -4,6 +4,7 @@ import sys
 from typing import TYPE_CHECKING, Any, AsyncIterator, NoReturn, Optional, Tuple
 from anyio import (
     BrokenResourceError,
+    ClosedResourceError,
     EndOfStream,
     IncompleteRead,
     connect_tcp,
@@ -150,7 +151,7 @@ class PeerConnection(AsyncResource):
     async def read(self, length: int) -> bytes:
         try:
             return await self.readstream.receive_exactly(length)
-        except (EndOfStream, IncompleteRead, BrokenResourceError):
+        except (EndOfStream, IncompleteRead, BrokenResourceError, ClosedResourceError):
             self.error("Peer closed the connection early")
 
     async def handshake(self) -> None:
@@ -204,7 +205,10 @@ class PeerConnection(AsyncResource):
 
     async def aiter_messages(self) -> AsyncIterator[Message]:
         while True:
-            blen = await self.read(4)
+            try:
+                blen = await self.read(4)
+            except PeerError:
+                return
             length = int.from_bytes(blen, "big")
             if length > MAX_PEER_MSG_LEN:
                 self.error(
