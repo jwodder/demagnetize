@@ -5,6 +5,7 @@ from typing import AsyncContextManager, AsyncIterable
 import attr
 import click
 from torf import Magnet, Torrent
+from torf._utils import decode_dict
 from .bencode import bencode
 from .consts import CLIENT
 from .errors import DemagnetizeFailure
@@ -87,7 +88,7 @@ class Demagnetizer:
 
 def compose_torrent(magnet: Magnet, info: dict) -> Torrent:
     torrent = Torrent()
-    torrent.metainfo["info"] = info
+    torrent.metainfo["info"] = decode_dict(info)
     torrent.trackers = magnet.tr
     torrent.created_by = CLIENT
     torrent.creation_date = time()
