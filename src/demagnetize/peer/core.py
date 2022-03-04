@@ -110,19 +110,15 @@ class Peer:
                 info_hash=info_hash,
                 msg="Could not connect to peer in time",
             )
-        try:  ###
-            async with s:
-                log.debug("Connected to %s", self)
-                async with create_task_group() as tg:
-                    async with PeerConnection(
-                        peer=self, app=app, socket=s, info_hash=info_hash, task_group=tg
-                    ) as conn:
-                        await conn.handshake()
-                        conn.start_tasks()
-                        yield conn
-        except StopAsyncIteration:  ###
-            log.exception("Unexpected StopAsyncIteration!!!")  ###
-            raise  ###
+        async with s:
+            log.debug("Connected to %s", self)
+            async with create_task_group() as tg:
+                async with PeerConnection(
+                    peer=self, app=app, socket=s, info_hash=info_hash, task_group=tg
+                ) as conn:
+                    await conn.handshake()
+                    conn.start_tasks()
+                    yield conn
 
 
 @attr.define
