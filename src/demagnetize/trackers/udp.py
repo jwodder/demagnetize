@@ -18,7 +18,14 @@ from typing import (
 from anyio import create_connected_udp_socket, fail_after
 from anyio.abc import ConnectedUDPSocket, SocketAttribute
 import attr
-from .base import AnnounceResponse, Tracker, TrackerSession, unpack_peers, unpack_peers6
+from .base import (
+    AnnounceEvent,
+    AnnounceResponse,
+    Tracker,
+    TrackerSession,
+    unpack_peers,
+    unpack_peers6,
+)
 from ..consts import LEFT, NUMWANT
 from ..errors import TrackerFailure
 from ..util import TRACE, InfoHash, Key, log
@@ -80,11 +87,24 @@ class UDPTrackerSession(TrackerSession):
     def reset_connection(self) -> None:
         self.connection = None
 
-    async def announce(self, info_hash: InfoHash) -> UDPAnnounceResponse:
+    async def announce(
+        self,
+        info_hash: InfoHash,
+        event: AnnounceEvent,
+        downloaded: int = 0,
+        uploaded: int = 0,
+        left: int = LEFT,
+    ) -> UDPAnnounceResponse:
         while True:
             conn = await self.get_connection()
             try:
-                return await conn.announce(info_hash)
+                return await conn.announce(
+                    info_hash,
+                    event,
+                    downloaded=downloaded,
+                    uploaded=uploaded,
+                    left=left,
+                )
             except ConnectionTimeoutError:
                 log.log(
                     TRACE,
@@ -153,7 +173,14 @@ class Connection:
     def __attrs_post_init__(self) -> None:
         self.expiration = time() + 60
 
-    async def announce(self, info_hash: InfoHash) -> UDPAnnounceResponse:
+    async def announce(
+        self,
+        info_hash: InfoHash,
+        event: AnnounceEvent,
+        downloaded: int = 0,
+        uploaded: int = 0,
+        left: int = LEFT,
+    ) -> UDPAnnounceResponse:
         transaction_id = make_transaction_id()
         msg = build_announce_request(
             transaction_id=transaction_id,
@@ -162,6 +189,10 @@ class Connection:
             peer_id=self.session.app.peer_id,
             peer_port=self.session.app.peer_port,
             key=self.session.app.key,
+            event=event,
+            downloaded=downloaded,
+            uploaded=uploaded,
+            left=left,
         )
         return await self.session.send_receive(
             msg,
@@ -217,22 +248,24 @@ def parse_connection_response(transaction_id: int, resp: bytes) -> int:
 
 
 def build_announce_request(
+    *,
     transaction_id: int,
     connection_id: int,
     info_hash: InfoHash,
     peer_id: bytes,
     peer_port: int,
     key: Key,
+    event: AnnounceEvent,
+    downloaded: int,
+    uploaded: int,
+    left: int,
 ) -> bytes:
-    downloaded = 0
-    uploaded = 0
-    event = 2
     ip_address = b"\0\0\0\0"
     return (
         struct.pack("!qii", connection_id, 1, transaction_id)
         + bytes(info_hash)
         + (peer_id + b"\0" * 20)[:20]
-        + struct.pack("!qqqi", downloaded, LEFT, uploaded, event)
+        + struct.pack("!qqqi", downloaded, left, uploaded, event.udp_value)
         + ip_address
         + bytes(key)
         + struct.pack("!iH", NUMWANT, peer_port)

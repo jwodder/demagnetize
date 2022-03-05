@@ -3,7 +3,14 @@ from typing import TYPE_CHECKING, Any, ClassVar, Optional, TypeVar, cast
 from urllib.parse import quote
 import attr
 from httpx import AsyncClient, HTTPError
-from .base import AnnounceResponse, Tracker, TrackerSession, unpack_peers, unpack_peers6
+from .base import (
+    AnnounceEvent,
+    AnnounceResponse,
+    Tracker,
+    TrackerSession,
+    unpack_peers,
+    unpack_peers6,
+)
 from ..bencode import unbencode
 from ..consts import CLIENT, LEFT, NUMWANT
 from ..errors import TrackerError, TrackerFailure, UnbencodeError
@@ -36,21 +43,29 @@ class HTTPTrackerSession(TrackerSession):
     async def aclose(self) -> None:
         await self.client.aclose()
 
-    async def announce(self, info_hash: InfoHash) -> HTTPAnnounceResponse:
+    async def announce(
+        self,
+        info_hash: InfoHash,
+        event: AnnounceEvent,
+        downloaded: int = 0,
+        uploaded: int = 0,
+        left: int = LEFT,
+    ) -> HTTPAnnounceResponse:
         # As of v0.22.0, the only way to send a bytes query parameter through
         # httpx is if we do all of the encoding ourselves.
         params = (
             f"info_hash={quote(bytes(info_hash))}"
             f"&peer_id={quote(self.app.peer_id)}"
             f"&port={self.app.peer_port}"
-            "&uploaded=0"
-            "&downloaded=0"
-            f"&left={LEFT}"
-            "&event=started"
-            "&compact=1"
+            f"&uploaded={uploaded}"
+            f"&downloaded={downloaded}"
+            f"&left={left}"
             f"&numwant={NUMWANT}"
             f"&key={quote(str(self.app.key))}"
+            "&compact=1"
         )
+        if event.http_value:
+            params += f"&event={event.http_value}"
         url = self.tracker.url.with_fragment(None)
         if url.query_string:
             target = f"{url}&{params}"
@@ -70,7 +85,6 @@ class HTTPTrackerSession(TrackerSession):
                 info_hash=info_hash,
                 msg=f"Request to tracker returned {r.status_code}",
             )
-        ### TODO: Should we send a "stopped" event to the tracker now?
         log.log(TRACE, "%s replied with: %r", self.tracker, r.content)
         try:
             response = HTTPAnnounceResponse.parse(r.content)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from enum import Enum
 from ipaddress import AddressValueError, IPv4Address, IPv6Address
 import struct
 from typing import TYPE_CHECKING, ClassVar
@@ -7,7 +8,7 @@ from anyio import fail_after
 from anyio.abc import AsyncResource
 import attr
 from yarl import URL
-from ..consts import TRACKER_TIMEOUT
+from ..consts import LEFT, TRACKER_TIMEOUT
 from ..errors import TrackerError, TrackerFailure
 from ..peer import Peer
 from ..util import TRACE, InfoHash, log
@@ -37,7 +38,9 @@ class Tracker(ABC):
         try:
             with fail_after(TRACKER_TIMEOUT):
                 async with await self.connect(app) as conn:
-                    peers = (await conn.announce(info_hash)).peers
+                    peers = (
+                        await conn.announce(info_hash, AnnounceEvent.STARTED)
+                    ).peers
                     log.info("%s returned %d peers", self, len(peers))
                     log.log(
                         TRACE,
@@ -70,8 +73,26 @@ class Tracker(ABC):
 
 class TrackerSession(AsyncResource):
     @abstractmethod
-    async def announce(self, info_hash: InfoHash) -> AnnounceResponse:
+    async def announce(
+        self,
+        info_hash: InfoHash,
+        event: AnnounceEvent,
+        downloaded: int = 0,
+        uploaded: int = 0,
+        left: int = LEFT,
+    ) -> AnnounceResponse:
         ...
+
+
+class AnnounceEvent(Enum):
+    ANNOUNCE = ("", 0)
+    COMPLETED = ("completed", 1)
+    STARTED = ("started", 2)
+    STOPPED = ("stopped", 3)
+
+    def __init__(self, http_value: str, udp_value: int) -> None:
+        self.http_value = http_value
+        self.udp_value = udp_value
 
 
 @attr.define
