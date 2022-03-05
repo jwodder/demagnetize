@@ -18,10 +18,9 @@ from typing import (
 from anyio import create_connected_udp_socket, fail_after
 from anyio.abc import ConnectedUDPSocket, SocketAttribute
 import attr
-from .base import Tracker, TrackerSession, unpack_peers, unpack_peers6
+from .base import AnnounceResponse, Tracker, TrackerSession, unpack_peers, unpack_peers6
 from ..consts import LEFT, NUMWANT
 from ..errors import TrackerFailure
-from ..peer import Peer
 from ..util import TRACE, InfoHash, Key, log
 
 if TYPE_CHECKING:
@@ -81,11 +80,11 @@ class UDPTrackerSession(TrackerSession):
     def reset_connection(self) -> None:
         self.connection = None
 
-    async def announce(self, info_hash: InfoHash) -> list[Peer]:
+    async def announce(self, info_hash: InfoHash) -> UDPAnnounceResponse:
         while True:
             conn = await self.get_connection()
             try:
-                r = await conn.announce(info_hash)
+                return await conn.announce(info_hash)
             except ConnectionTimeoutError:
                 log.log(
                     TRACE,
@@ -93,15 +92,6 @@ class UDPTrackerSession(TrackerSession):
                     self.tracker,
                 )
                 self.reset_connection()
-                continue
-            log.info("%s returned %d peers", self.tracker, len(r.peers))
-            log.log(
-                TRACE,
-                "%s returned peers: %s",
-                self.tracker,
-                ", ".join(map(str, r.peers)),
-            )
-            return r.peers
 
     async def send_receive(
         self,
@@ -163,7 +153,7 @@ class Connection:
     def __attrs_post_init__(self) -> None:
         self.expiration = time() + 60
 
-    async def announce(self, info_hash: InfoHash) -> AnnounceResponse:
+    async def announce(self, info_hash: InfoHash) -> UDPAnnounceResponse:
         transaction_id = make_transaction_id()
         msg = build_announce_request(
             transaction_id=transaction_id,
@@ -189,11 +179,9 @@ class ConnectionTimeoutError(Exception):
 
 
 @attr.define
-class AnnounceResponse:
-    interval: int
+class UDPAnnounceResponse(AnnounceResponse):
     leechers: int
     seeders: int
-    peers: list[Peer]
 
 
 def make_transaction_id() -> int:
@@ -253,7 +241,7 @@ def build_announce_request(
 
 def parse_announce_response(
     transaction_id: int, resp: bytes, is_ipv6: bool
-) -> AnnounceResponse:
+) -> UDPAnnounceResponse:
     raise_error_response(resp)
     header = struct.Struct("!iiiii")
     action, xaction_id, interval, leechers, seeders = header.unpack_from(resp)
@@ -268,6 +256,6 @@ def parse_announce_response(
         peers = unpack_peers6(resp)
     else:
         peers = unpack_peers(resp)
-    return AnnounceResponse(
+    return UDPAnnounceResponse(
         interval=interval, leechers=leechers, seeders=seeders, peers=peers
     )

@@ -10,7 +10,7 @@ from yarl import URL
 from ..consts import TRACKER_TIMEOUT
 from ..errors import TrackerError, TrackerFailure
 from ..peer import Peer
-from ..util import InfoHash, log
+from ..util import TRACE, InfoHash, log
 
 if TYPE_CHECKING:
     from ..core import Demagnetizer
@@ -37,7 +37,15 @@ class Tracker(ABC):
         try:
             with fail_after(TRACKER_TIMEOUT):
                 async with await self.connect(app) as conn:
-                    return await conn.announce(info_hash)
+                    peers = (await conn.announce(info_hash)).peers
+                    log.info("%s returned %d peers", self, len(peers))
+                    log.log(
+                        TRACE,
+                        "%s returned peers: %s",
+                        self,
+                        ", ".join(map(str, peers)),
+                    )
+                    return peers
         except TrackerFailure as e:
             raise TrackerError(
                 tracker=self,
@@ -62,8 +70,14 @@ class Tracker(ABC):
 
 class TrackerSession(AsyncResource):
     @abstractmethod
-    async def announce(self, info_hash: InfoHash) -> list[Peer]:
+    async def announce(self, info_hash: InfoHash) -> AnnounceResponse:
         ...
+
+
+@attr.define
+class AnnounceResponse:
+    interval: int
+    peers: list[Peer]
 
 
 def unpack_peers(data: bytes) -> list[Peer]:

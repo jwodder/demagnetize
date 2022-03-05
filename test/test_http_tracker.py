@@ -1,6 +1,6 @@
 import pytest
 from demagnetize.peer import Peer
-from demagnetize.trackers.http import Response
+from demagnetize.trackers.http import HTTPAnnounceResponse
 
 
 @pytest.mark.parametrize(
@@ -22,7 +22,7 @@ from demagnetize.trackers.http import Response
             b"\xc9\x98\xa6\x00\x01\xb9\xba\xf9\t\x1a\xe1\x86\x13\xbc[\xce\x9bD"
             b'\xeb,G\xd9|.5\xfd\xf1\xd4\xf1\x1b"\x14I\xa4\xbe\xb0)\x1b\xedp'
             b"\xcb\xac\xf1\xe0.I\x84m\xc9\x98\xaf\x00\x01e",
-            Response(
+            HTTPAnnounceResponse(
                 complete=47,
                 incomplete=5,
                 interval=1800,
@@ -83,7 +83,7 @@ from demagnetize.trackers.http import Response
         ),
         (
             b"d8:intervali1800e5:peers6:iiiipp6:peers618:iiiiiiiiiiiiiiiippe",
-            Response(
+            HTTPAnnounceResponse(
                 interval=1800,
                 peers=[
                     Peer("105.105.105.105", 28784),
@@ -93,8 +93,8 @@ from demagnetize.trackers.http import Response
         ),
     ],
 )
-def test_parse_response(blob: bytes, obj: Response) -> None:
-    assert Response.parse(blob) == obj
+def test_parse_response(blob: bytes, obj: HTTPAnnounceResponse) -> None:
+    assert HTTPAnnounceResponse.parse(blob) == obj
 
 
 @pytest.mark.parametrize(
@@ -106,4 +106,4 @@ def test_parse_response(blob: bytes, obj: Response) -> None:
 )
 def test_parse_bad_response(blob: bytes) -> None:
     with pytest.raises(ValueError):
-        Response.parse(blob)
+        HTTPAnnounceResponse.parse(blob)
