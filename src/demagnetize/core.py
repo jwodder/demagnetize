@@ -2,6 +2,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from pathlib import Path
 from random import randint
+import sys
 from time import time
 from typing import AsyncIterator
 from anyio import create_memory_object_stream, create_task_group
@@ -25,6 +26,11 @@ from .util import (
     make_peer_id,
     template_torrent_filename,
 )
+
+if sys.version_info >= (3, 10):
+    from contextlib import aclosing
+else:
+    from async_generator import aclosing
 
 
 @attr.define
@@ -93,10 +99,10 @@ class Demagnetizer:
     async def get_peers_for_magnet(
         self, magnet: Magnet
     ) -> AsyncIterator[AsyncIterator[Peer]]:
+        session = self.open_session(magnet)
         async with create_task_group() as tg:
-            receiver = await self.open_session(magnet).get_all_peers(tg)
-            async with receiver:
-                yield receiver
+            async with aclosing(session.get_all_peers(tg)) as ait:
+                yield ait
 
     async def get_info_from_peer(self, peer: Peer, info_hash: InfoHash) -> bytes:
         info = await peer.get_info(self, info_hash)
