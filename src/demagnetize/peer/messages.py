@@ -6,7 +6,7 @@ from operator import or_
 import struct
 from typing import Any, ClassVar, Optional
 import attr
-from .extensions import BEP9MsgType, BEP10Registry
+from .extensions import BEP9MsgType, BEP10Registry, Extension
 from ..bencode import bencode, partial_unbencode, unbencode
 from ..errors import UnbencodeError, UnknownBEP9MsgType
 from ..util import InfoHash, get_string, get_typed_value
@@ -45,6 +45,16 @@ class Handshake:
         offset += 20
         peer_id = blob[offset:]
         return cls(extensions=extensions, info_hash=info_hash, peer_id=peer_id)
+
+    @property
+    def extension_names(self) -> list[str]:
+        extnames: list[str] = []
+        for ext in sorted(self.extensions):
+            try:
+                extnames.append(Extension(ext).name)
+            except ValueError:
+                extnames.append(str(ext))
+        return extnames
 
 
 class Message(ABC):

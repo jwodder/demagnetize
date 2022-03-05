@@ -174,16 +174,10 @@ class PeerConnection(AsyncResource):
         except ValueError as e:
             log.log(TRACE, "Bad handshake from %s: %r", self.peer, r)
             self.error(f"Peer sent bad handshake: {e}")
-        extnames: list[str] = []
-        for ext in sorted(hs.extensions):
-            try:
-                extnames.append(Extension(ext).name)
-            except ValueError:
-                extnames.append(str(ext))
         log.debug(
-            "%s sent handshake: extensions=%s, peer_id=%s",
+            "%s sent handshake; extensions: %s; peer_id: %s",
             self.peer,
-            " | ".join(extnames) or "<none>",
+            ", ".join(hs.extension_names) or "<none>",
             hs.peer_id.decode("utf-8", "replace"),
         )
         if hs.info_hash != self.info_hash:
