@@ -6,9 +6,10 @@ import struct
 from typing import TYPE_CHECKING, ClassVar
 from anyio import fail_after
 from anyio.abc import AsyncResource
+from anyio.streams.memory import MemoryObjectSendStream
 import attr
 from yarl import URL
-from ..consts import LEFT, TRACKER_TIMEOUT
+from ..consts import LEFT, TRACKER_STOP_TIMEOUT, TRACKER_TIMEOUT
 from ..errors import TrackerError, TrackerFailure
 from ..peer import Peer
 from ..util import TRACE, InfoHash, log
@@ -33,11 +34,22 @@ class Tracker(ABC):
                 return klass(url=u)  # type: ignore[abstract]
         raise ValueError(f"Unsupported tracker URL scheme {u.scheme!r}")
 
-    async def get_peers(self, app: Demagnetizer, info_hash: InfoHash) -> list[Peer]:
+    async def get_peers(
+        self,
+        app: Demagnetizer,
+        info_hash: InfoHash,
+        sender: MemoryObjectSendStream[Peer],
+    ) -> None:
         log.info("Requesting peers for %s from %s", info_hash, self)
         try:
             with fail_after(TRACKER_TIMEOUT):
-                async with await self.connect(app) as conn:
+                async with sender, await self.connect(app) as conn:
+                    log.log(
+                        TRACE,
+                        "Sending 'started' announcement to %s for %s",
+                        self,
+                        info_hash,
+                    )
                     peers = (
                         await conn.announce(info_hash, AnnounceEvent.STARTED)
                     ).peers
@@ -48,22 +60,32 @@ class Tracker(ABC):
                         self,
                         ", ".join(map(str, peers)),
                     )
-                    return peers
+                    for p in peers:
+                        await sender.send(p)
+                    with fail_after(TRACKER_STOP_TIMEOUT, shield=True):
+                        log.log(
+                            TRACE,
+                            "Sending 'stopped' announcement to %s for %s",
+                            self,
+                            info_hash,
+                        )
+                        await conn.announce(info_hash, AnnounceEvent.STOPPED)
+        except TrackerError as e:
+            log.warning(
+                "Error getting peers for %s from %s: %s", info_hash, self, e.msg
+            )
         except TrackerFailure as e:
-            raise TrackerError(
-                tracker=self,
-                info_hash=info_hash,
-                msg=f"Tracker replied with failure: {e}",
+            log.warning(
+                "%s replied to announcement for %s with failure message: %s",
+                self,
+                info_hash,
+                e,
             )
         except TimeoutError:
-            raise TrackerError(
-                tracker=self, info_hash=info_hash, msg="Tracker did not respond in time"
-            )
+            log.warning("%s did not respond in time", self)
         except OSError as e:
-            raise TrackerError(
-                tracker=self,
-                info_hash=info_hash,
-                msg=f"Error communicating with tracker: {type(e).__name__}: {e}",
+            log.warning(
+                "Error communicating with %s: %s: %s", self, type(e).__name__, e
             )
 
     @abstractmethod

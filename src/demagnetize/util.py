@@ -160,28 +160,6 @@ async def _acollect_pipe(coro: Awaitable[T], sender: MemoryObjectSendStream[T]) 
         await sender.send(value)
 
 
-@asynccontextmanager
-async def acollectiter(
-    coros: Iterable[Awaitable[Iterable[T]]],
-) -> AsyncIterator[AsyncIterator[T]]:
-    async with create_task_group() as tg:
-        sender, receiver = create_memory_object_stream()
-        async with sender:
-            for c in coros:
-                tg.start_soon(_acollectiter_pipe, c, sender.clone())
-        async with receiver:
-            yield receiver
-
-
-async def _acollectiter_pipe(
-    coro: Awaitable[Iterable[T]], sender: MemoryObjectSendStream[T]
-) -> None:
-    async with sender:
-        values = await coro
-        for v in values:
-            await sender.send(v)
-
-
 @attr.define
 class AsyncCell(Generic[T]):
     event: Event = attr.Factory(Event)

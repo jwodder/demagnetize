@@ -1,11 +1,5 @@
 from __future__ import annotations
-from typing import (
-    TYPE_CHECKING,
-    AsyncContextManager,
-    AsyncIterator,
-    Awaitable,
-    Iterable,
-)
+from typing import TYPE_CHECKING
 from anyio import (
     CapacityLimiter,
     EndOfStream,
@@ -13,14 +7,14 @@ from anyio import (
     create_task_group,
 )
 from anyio.abc import TaskGroup
-from anyio.streams.memory import MemoryObjectSendStream
+from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 import attr
 from torf import Magnet
 from .consts import PEERS_PER_MAGNET_LIMIT
-from .errors import DemagnetizeError, PeerError, TrackerError
+from .errors import DemagnetizeError, PeerError
 from .peer import Peer
 from .trackers import Tracker
-from .util import InfoHash, acollectiter, log
+from .util import InfoHash, log
 
 if TYPE_CHECKING:
     from .core import Demagnetizer
@@ -51,8 +45,9 @@ class TorrentSession:
             display = ""
         log.info("Fetching info for info hash %s%s", self.info_hash, display)
         async with create_task_group() as tg:
+            peer_receiver = await self.get_all_peers(tg)
             info_sender, info_receiver = create_memory_object_stream(0, dict)
-            tg.start_soon(self._peer_pipe, self.get_all_peers(), info_sender, tg)
+            tg.start_soon(self._peer_pipe, peer_receiver, info_sender, tg)
             async with info_receiver:
                 try:
                     md = await info_receiver.receive()
@@ -61,37 +56,30 @@ class TorrentSession:
             tg.cancel_scope.cancel()
             return md
 
-    def get_all_peers(self) -> AsyncContextManager[AsyncIterator[Peer]]:
-        coros: list[Awaitable[Iterable[Peer]]] = []
-        for url in self.magnet.tr:
-            try:
-                tracker = Tracker.from_url(url)
-            except ValueError as e:
-                log.warning("%s: Invalid tracker URL: %s", url, e)
-            else:
-                coros.append(self.get_peers_from_tracker(tracker))
-        return acollectiter(coros)
-
-    async def get_peers_from_tracker(self, tracker: Tracker) -> list[Peer]:
-        try:
-            return await tracker.get_peers(self.app, self.info_hash)
-        except TrackerError as e:
-            log.warning(
-                "Error getting peers for %s from %s: %s",
-                self.info_hash,
-                tracker,
-                e.msg,
-            )
-            return []
+    async def get_all_peers(
+        self, task_group: TaskGroup
+    ) -> MemoryObjectReceiveStream[Peer]:
+        sender, receiver = create_memory_object_stream()
+        async with sender:
+            for url in self.magnet.tr:
+                try:
+                    tracker = Tracker.from_url(url)
+                except ValueError as e:
+                    log.warning("%s: Invalid tracker URL: %s", url, e)
+                else:
+                    task_group.start_soon(
+                        tracker.get_peers, self.app, self.info_hash, sender.clone()
+                    )
+        return receiver
 
     async def _peer_pipe(
         self,
-        peer_receiver: AsyncContextManager[AsyncIterator[Peer]],
+        peer_receiver: MemoryObjectReceiveStream[Peer],
         info_sender: MemoryObjectSendStream[dict],
         task_group: TaskGroup,
     ) -> None:
-        async with peer_receiver as pait, info_sender:
-            async for peer in pait:
+        async with peer_receiver, info_sender:
+            async for peer in peer_receiver:
                 task_group.start_soon(self._peer_task, peer, info_sender.clone())
 
     async def _peer_task(

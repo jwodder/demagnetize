@@ -1,8 +1,10 @@
 from __future__ import annotations
+from contextlib import asynccontextmanager
 from pathlib import Path
 from random import randint
 from time import time
-from typing import AsyncContextManager, AsyncIterable
+from typing import AsyncIterator
+from anyio import create_memory_object_stream, create_task_group
 import attr
 import click
 from torf import Magnet, Torrent
@@ -78,12 +80,23 @@ class Demagnetizer:
     async def get_peers_from_tracker(
         self, tracker: Tracker, info_hash: InfoHash
     ) -> list[Peer]:
-        return await tracker.get_peers(self, info_hash)
+        async with create_task_group() as tg:
+            sender, receiver = create_memory_object_stream()
+            tg.start_soon(tracker.get_peers, self, info_hash, sender)
+            peers: list[Peer] = []
+            async with receiver:
+                async for p in receiver:
+                    peers.append(p)
+            return peers
 
-    def get_peers_for_magnet(
+    @asynccontextmanager
+    async def get_peers_for_magnet(
         self, magnet: Magnet
-    ) -> AsyncContextManager[AsyncIterable[Peer]]:
-        return self.open_session(magnet).get_all_peers()
+    ) -> AsyncIterator[AsyncIterator[Peer]]:
+        async with create_task_group() as tg:
+            receiver = await self.open_session(magnet).get_all_peers(tg)
+            async with receiver:
+                yield receiver
 
     async def get_info_from_peer(self, peer: Peer, info_hash: InfoHash) -> bytes:
         info = await peer.get_info(self, info_hash)

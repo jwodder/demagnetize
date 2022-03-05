@@ -150,7 +150,6 @@ class UDPTrackerSession(TrackerSession):
                     except TrackerFailure:
                         raise
                     except Exception as e:
-                        ### TODO: Raise an error instead?
                         log.log(
                             TRACE,
                             "Response from %s was invalid, will resend: %s: %s",
