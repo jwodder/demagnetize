@@ -143,8 +143,6 @@ class PeerConnection(AsyncResource):
             for s in self.subscribers:
                 await s.aclose()
             self.task_group.cancel_scope.cancel()
-            await self.readstream.aclose()
-            await self.socket.aclose()
 
     async def send(self, msg: Message) -> None:
         log.log(TRACE, "Sending to %s: %s", self.peer, msg)
