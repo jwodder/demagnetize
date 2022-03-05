@@ -4,6 +4,7 @@ import sys
 from typing import TYPE_CHECKING, Any, AsyncIterator, NoReturn, Optional, Tuple
 from anyio import (
     BrokenResourceError,
+    CancelScope,
     ClosedResourceError,
     EndOfStream,
     IncompleteRead,
@@ -138,11 +139,12 @@ class PeerConnection(AsyncResource):
         self.readstream = BufferedByteReceiveStream(self.socket)
 
     async def aclose(self) -> None:
-        for s in self.subscribers:
-            await s.aclose()
-        self.task_group.cancel_scope.cancel()
-        await self.readstream.aclose()
-        await self.socket.aclose()
+        with CancelScope(shield=True):
+            for s in self.subscribers:
+                await s.aclose()
+            self.task_group.cancel_scope.cancel()
+            await self.readstream.aclose()
+            await self.socket.aclose()
 
     async def send(self, msg: Message) -> None:
         log.log(TRACE, "Sending to %s: %s", self.peer, msg)
