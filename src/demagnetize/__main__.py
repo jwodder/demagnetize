@@ -6,6 +6,7 @@ from typing import Optional, TextIO
 import anyio
 import click
 from click_loglevel import LogLevel
+import colorlog
 from torf import Magnet
 from .core import Demagnetizer
 from .peer import Peer
@@ -33,9 +34,17 @@ def validate_template(
     help="Set logging level  [default: INFO]",
 )
 def main(log_level: int) -> None:
-    logging.basicConfig(
-        format="%(asctime)s [%(levelname)-8s] %(name)s: %(message)s",
+    colorlog.basicConfig(
+        format="%(log_color)s%(asctime)s [%(levelname)-8s] %(name)s: %(message)s",
         datefmt="%H:%M:%S",
+        log_colors={
+            "TRACE": "green",
+            "DEBUG": "cyan",
+            "INFO": "bold",
+            "WARNING": "yellow",
+            "ERROR": "red",
+            "CRITICAL": "bold_red",
+        },
         level=log_level,
     )
     logging.addLevelName(TRACE, "TRACE")
