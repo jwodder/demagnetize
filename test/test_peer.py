@@ -1,7 +1,13 @@
 from __future__ import annotations
 from typing import Optional
 import pytest
-from demagnetize.peer.extensions import BEP9MsgType, BEP10Registry, Extension, extbit
+from demagnetize.peer.extensions import (
+    BEP9MsgType,
+    BEP10Extension,
+    BEP10Registry,
+    Extension,
+    extbit,
+)
 from demagnetize.peer.messages import (
     BEP9Message,
     Extended,
@@ -151,7 +157,9 @@ def test_message(blob: bytes, msg: Message) -> None:
                     b"yourip": b"\x99\xa2D\x9b",
                 }
             ),
-            BEP10Registry.from_dict({b"ut_metadata": 2, b"ut_pex": 1}),
+            BEP10Registry.from_dict(
+                {BEP10Extension.METADATA: 2, BEP10Extension.PEX: 1}
+            ),
             [
                 "lt_donthave",
                 "share_mode",
@@ -181,7 +189,9 @@ def test_message(blob: bytes, msg: Message) -> None:
                     b"v": b"Transmission 3.00",
                 }
             ),
-            BEP10Registry.from_dict({b"ut_metadata": 3, b"ut_pex": 1}),
+            BEP10Registry.from_dict(
+                {BEP10Extension.METADATA: 3, BEP10Extension.PEX: 1}
+            ),
             ["ut_metadata", "ut_pex"],
             "Transmission 3.00",
             None,

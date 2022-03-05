@@ -55,8 +55,11 @@ if TYPE_CHECKING:
 
 SUPPORTED_EXTENSIONS = {Extension.BEP10_EXTENSIONS, Extension.FAST}
 
-BEP10_EXTENSIONS = BEP10Registry()
-BEP10_EXTENSIONS.register(BEP10Extension.METADATA, UT_METADATA)
+BEP10_EXTENSIONS = BEP10Registry.from_dict(
+    {
+        BEP10Extension.METADATA: UT_METADATA,
+    }
+)
 
 PeerAddress = Tuple[str, int]  # Can't be written as "tuple[str, int]" in 3.8
 

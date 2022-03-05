@@ -35,7 +35,14 @@ class BEP10Registry:
         return ext in self.to_code
 
     @classmethod
-    def from_dict(cls, m: dict) -> BEP10Registry:
+    def from_dict(cls, d: dict[BEP10Extension, int]) -> BEP10Registry:
+        msg_ids = cls()
+        for ext, code in d.items():
+            msg_ids.register(ext, code)
+        return msg_ids
+
+    @classmethod
+    def from_m(cls, m: dict) -> BEP10Registry:
         msg_ids = cls()
         for k, v in m.items():
             if not isinstance(k, bytes):
@@ -60,7 +67,7 @@ class BEP10Registry:
         self.from_code[code] = ext
         self.to_code[ext] = code
 
-    def as_dict(self) -> dict[bytes, int]:
+    def to_m(self) -> dict[bytes, int]:
         return {k.value.encode("utf-8"): v for k, v in self.to_code.items()}
 
 

@@ -379,7 +379,7 @@ class ExtendedHandshake:
         client: Optional[str] = None,
         metadata_size: Optional[int] = None,
     ) -> ExtendedHandshake:
-        data: dict[bytes, Any] = {b"m": extensions.as_dict()}
+        data: dict[bytes, Any] = {b"m": extensions.to_m()}
         if client is not None:
             data[b"v"] = client.encode("utf-8")
         if metadata_size is not None:
@@ -408,7 +408,7 @@ class ExtendedHandshake:
 
     @property
     def extensions(self) -> BEP10Registry:
-        return BEP10Registry.from_dict(self.data[b"m"])
+        return BEP10Registry.from_m(self.data[b"m"])
 
     @property
     def client(self) -> Optional[str]:
