@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, ClassVar, Optional, TypeVar, cast
+from typing import TYPE_CHECKING, ClassVar, Optional, TypeVar, cast
 from urllib.parse import quote
 import attr
 from httpx import AsyncClient, HTTPError
@@ -15,7 +15,7 @@ from ..bencode import unbencode
 from ..consts import CLIENT, LEFT, NUMWANT
 from ..errors import TrackerError, TrackerFailure, UnbencodeError
 from ..peer import Peer
-from ..util import TRACE, InfoHash, log
+from ..util import TRACE, InfoHash, get_string, get_typed_value, log
 
 if TYPE_CHECKING:
     from ..core import Demagnetizer
@@ -123,11 +123,6 @@ class HTTPAnnounceResponse(AnnounceResponse):
                 # Do our best to salvage the situation
                 failure_reason = str(failure)
             raise TrackerFailure(failure_reason)
-        warning_message: Optional[str]
-        if (warning := get_typed_value(data, b"warning message", bytes)) is not None:
-            warning_message = warning.decode("utf-8", "replace")
-        else:
-            warning_message = None
         if (interval := get_typed_value(data, b"interval", int)) is None:
             # Just fill in a reasonable default
             interval = 1800
@@ -165,17 +160,9 @@ class HTTPAnnounceResponse(AnnounceResponse):
         return cls(
             interval=interval,
             peers=peers,
-            warning_message=warning_message,
+            warning_message=get_string(data, b"warning message"),
             min_interval=get_typed_value(data, b"min interval", int),
             tracker_id=get_typed_value(data, b"tracker id", bytes),
             complete=get_typed_value(data, b"complete", int),
             incomplete=get_typed_value(data, b"incomplete", int),
         )
-
-
-def get_typed_value(data: dict, key: Any, klass: type[T]) -> Optional[T]:
-    value = data.get(key)
-    if isinstance(value, klass):
-        return value
-    else:
-        return None

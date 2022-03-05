@@ -9,7 +9,7 @@ import attr
 from .extensions import BEP9MsgType, BEP10Registry
 from ..bencode import bencode, partial_unbencode, unbencode
 from ..errors import UnbencodeError, UnknownBEP9MsgType
-from ..util import InfoHash
+from ..util import InfoHash, get_string, get_typed_value
 
 
 @attr.define
@@ -370,9 +370,21 @@ class Extended(Message):
 
 @attr.define
 class ExtendedHandshake:
-    extensions: BEP10Registry
-    v: Optional[str] = None
-    metadata_size: Optional[int] = None
+    data: dict
+
+    @classmethod
+    def make(
+        cls,
+        extensions: BEP10Registry,
+        client: Optional[str] = None,
+        metadata_size: Optional[int] = None,
+    ) -> ExtendedHandshake:
+        data: dict[bytes, Any] = {b"m": extensions.as_dict()}
+        if client is not None:
+            data[b"v"] = client.encode("utf-8")
+        if metadata_size is not None:
+            data[b"metadata_size"] = metadata_size
+        return cls(data)
 
     @classmethod
     def parse(cls, payload: bytes) -> ExtendedHandshake:
@@ -380,23 +392,34 @@ class ExtendedHandshake:
             data = unbencode(payload)
         except UnbencodeError:
             raise ValueError("invalid bencoded data")
-        m = data.get(b"m")
-        if not isinstance(m, dict):
+        if not isinstance(data, dict):
+            raise ValueError("payload is not a dict")
+        if not isinstance(data.get(b"m"), dict):
             raise ValueError("'m' dictionary missing")
-        handshake = cls(extensions=BEP10Registry.from_handshake_m(m))
-        if isinstance(v := data.get(b"v"), bytes):
-            handshake.v = v.decode("utf-8", "replace")
-        if isinstance(size := data.get(b"metadata_size"), int):
-            handshake.metadata_size = size
-        return handshake
+        return cls(data)
+
+    @property
+    def extension_names(self) -> list[str]:
+        exts: list[str] = []
+        for k in self.data[b"m"]:
+            assert isinstance(k, bytes)
+            exts.append(k.decode("utf-8", "replace"))
+        return exts
+
+    @property
+    def extensions(self) -> BEP10Registry:
+        return BEP10Registry.from_dict(self.data[b"m"])
+
+    @property
+    def client(self) -> Optional[str]:
+        return get_string(self.data, b"v")
+
+    @property
+    def metadata_size(self) -> Optional[int]:
+        return get_typed_value(self.data, b"metadata_size", int)
 
     def compose(self) -> Extended:
-        data: dict[bytes, Any] = {b"m": self.extensions.as_dict()}
-        if self.v is not None:
-            data[b"v"] = self.v.encode("utf-8")
-        if self.metadata_size is not None:
-            data[b"metadata-size"] = self.metadata_size
-        return Extended(msg_id=0, payload=bencode(data))
+        return Extended(msg_id=0, payload=bencode(self.data))
 
 
 @attr.define

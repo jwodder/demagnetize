@@ -61,8 +61,16 @@ class ExtendedHandshakeSubscriber(Subscriber):
             handshake = ExtendedHandshake.parse(msg.payload)
         except ValueError as e:
             self.conn.error(f"Peer sent invalid extension handshake: {e}")
-        if handshake.v is not None:
-            log.debug("%s is running %s", self.conn.peer, handshake.v)
+        if handshake.client is not None:
+            extra = f"; client: {handshake.client}"
+        else:
+            extra = ""
+        log.debug(
+            "%s sent BEP 10 extended handshake; extensions: %s%s",
+            self.conn.peer,
+            ", ".join(handshake.extension_names) or "<none>",
+            extra,
+        )
         self.conn.bep10_handshake.set(handshake)
 
     async def aclose(self) -> None:

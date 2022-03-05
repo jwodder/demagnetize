@@ -221,3 +221,17 @@ class InfoPiecer:
 
     def get_digest(self) -> str:
         return cast(str, self.digest.hexdigest())
+
+
+def get_typed_value(data: dict, key: Any, klass: type[T]) -> Optional[T]:
+    if isinstance(value := data.get(key), klass):
+        return value
+    else:
+        return None
+
+
+def get_string(data: dict, key: Any) -> Optional[str]:
+    if isinstance(value := data.get(key), bytes):
+        return value.decode("utf-8", "replace")
+    else:
+        return None

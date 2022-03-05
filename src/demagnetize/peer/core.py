@@ -190,7 +190,9 @@ class PeerConnection(AsyncResource):
         self.extensions = SUPPORTED_EXTENSIONS & hs.extensions
         if Extension.BEP10_EXTENSIONS in self.extensions:
             self.subscribers.append(ExtendedHandshakeSubscriber(self))
-            handshake = ExtendedHandshake(extensions=BEP10_EXTENSIONS, v=CLIENT)
+            handshake = ExtendedHandshake.make(
+                extensions=BEP10_EXTENSIONS, client=CLIENT
+            )
             await self.send(handshake.compose())
         else:
             self.error("Peer does not support BEP 10 extensions")

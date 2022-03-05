@@ -35,7 +35,7 @@ class BEP10Registry:
         return ext in self.to_code
 
     @classmethod
-    def from_handshake_m(cls, m: dict) -> BEP10Registry:
+    def from_dict(cls, m: dict) -> BEP10Registry:
         msg_ids = cls()
         for k, v in m.items():
             if not isinstance(k, bytes):

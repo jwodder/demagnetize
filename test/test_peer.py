@@ -1,8 +1,11 @@
+from __future__ import annotations
+from typing import Optional
 import pytest
-from demagnetize.peer.extensions import BEP9MsgType, Extension, extbit
+from demagnetize.peer.extensions import BEP9MsgType, BEP10Registry, Extension, extbit
 from demagnetize.peer.messages import (
     BEP9Message,
     Extended,
+    ExtendedHandshake,
     Handshake,
     HaveAll,
     HaveNone,
@@ -120,6 +123,85 @@ def test_handshake(blob: bytes, handshake: Handshake) -> None:
 def test_message(blob: bytes, msg: Message) -> None:
     assert Message.parse(blob) == msg
     assert bytes(msg) == blob
+
+
+@pytest.mark.parametrize(
+    "payload,handshake,extensions,extension_names,client,metadata_size",
+    [
+        (
+            b"d12:complete_agoi1441e1:md11:lt_donthavei7e10:share_modei8e11:upl"
+            b"oad_onlyi3e12:ut_holepunchi4e11:ut_metadatai2e6:ut_pexi1ee13:meta"
+            b"data_sizei5436e4:reqqi500e11:upload_onlyi1e1:v17:qBittorrent/4.3."
+            b"66:yourip4:\x99\xa2D\x9be",
+            ExtendedHandshake(
+                {
+                    b"complete_ago": 1441,
+                    b"m": {
+                        b"lt_donthave": 7,
+                        b"share_mode": 8,
+                        b"upload_only": 3,
+                        b"ut_holepunch": 4,
+                        b"ut_metadata": 2,
+                        b"ut_pex": 1,
+                    },
+                    b"metadata_size": 5436,
+                    b"reqq": 500,
+                    b"upload_only": 1,
+                    b"v": b"qBittorrent/4.3.6",
+                    b"yourip": b"\x99\xa2D\x9b",
+                }
+            ),
+            BEP10Registry.from_dict({b"ut_metadata": 2, b"ut_pex": 1}),
+            [
+                "lt_donthave",
+                "share_mode",
+                "upload_only",
+                "ut_holepunch",
+                "ut_metadata",
+                "ut_pex",
+            ],
+            "qBittorrent/4.3.6",
+            5436,
+        ),
+        (
+            b"d1:ei0e4:ipv616:\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x011:md11:ut_metad"
+            b"atai3e6:ut_pexi1ee1:pi60069e4:reqqi512e11:upload_onlyi0e1:v17:Tra"
+            b"nsmission 3.00e",
+            ExtendedHandshake(
+                {
+                    b"e": 0,
+                    b"ipv6": b"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x01",
+                    b"m": {
+                        b"ut_metadata": 3,
+                        b"ut_pex": 1,
+                    },
+                    b"p": 60069,
+                    b"reqq": 512,
+                    b"upload_only": 0,
+                    b"v": b"Transmission 3.00",
+                }
+            ),
+            BEP10Registry.from_dict({b"ut_metadata": 3, b"ut_pex": 1}),
+            ["ut_metadata", "ut_pex"],
+            "Transmission 3.00",
+            None,
+        ),
+    ],
+)
+def test_extended_handshake(
+    payload: bytes,
+    handshake: ExtendedHandshake,
+    extensions: BEP10Registry,
+    extension_names: list[str],
+    client: Optional[str],
+    metadata_size: Optional[int],
+) -> None:
+    assert ExtendedHandshake.parse(payload) == handshake
+    assert handshake.compose() == Extended(0, payload)
+    assert handshake.extensions == extensions
+    assert handshake.extension_names == extension_names
+    assert handshake.client == client
+    assert handshake.metadata_size == metadata_size
 
 
 @pytest.mark.parametrize(
