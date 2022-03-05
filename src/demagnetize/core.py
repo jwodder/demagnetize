@@ -1,4 +1,5 @@
 from __future__ import annotations
+from pathlib import Path
 from random import randint
 from time import time
 from typing import AsyncContextManager, AsyncIterable
@@ -56,10 +57,16 @@ class Demagnetizer:
             log.error("%s", e)
             return Report.for_failure(magnet)
         try:
+            Path(filename).parent.mkdir(parents=True, exist_ok=True)
             with click.open_file(filename, "wb") as fp:
                 torrent.write_stream(fp)
         except Exception as e:
-            log.error("Error writing to file: %s: %s", type(e).__name__, e)
+            log.error(
+                "Error writing torrent to file %r: %s: %s",
+                filename,
+                type(e).__name__,
+                e,
+            )
             return Report.for_failure(magnet)
         return Report.for_success(magnet, filename)
 
