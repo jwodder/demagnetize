@@ -71,7 +71,7 @@ class BEP10Registry:
         return {k.value.encode("utf-8"): v for k, v in self.to_code.items()}
 
 
-class BEP9MsgType(Enum):
+class BEP9MsgType(IntEnum):
     REQUEST = 0
     DATA = 1
     REJECT = 2

@@ -43,7 +43,7 @@ from ..consts import (
     PEER_CONNECT_TIMEOUT,
     UT_METADATA,
 )
-from ..errors import CellClosedError, PeerError, UnbencodeError, UnknownBEP9MsgType
+from ..errors import CellClosedError, PeerError, UnbencodeError
 from ..util import TRACE, AsyncCell, InfoHash, InfoPiecer, log
 
 if sys.version_info >= (3, 10):
@@ -232,14 +232,6 @@ class PeerConnection(AsyncResource):
             except ValueError as e:
                 log.log(TRACE, "Bad message from %s: %r", self.peer, payload)
                 self.error(f"Peer sent invalid message: {e}")
-            except UnknownBEP9MsgType as e:
-                log.log(
-                    TRACE,
-                    "%s sent ut_metadata message with unknown msg_type %d; ignoring",
-                    self.peer,
-                    e.msg_type,
-                )
-                continue
             yield msg
 
     async def handle_messages(self) -> None:
@@ -291,7 +283,7 @@ class PeerConnection(AsyncResource):
                     )
                     await self.send(BEP9Message(msg_type=BEP9MsgType.REQUEST, piece=i))
                     async for msg in receiver:
-                        if msg.msg_type is BEP9MsgType.DATA:
+                        if msg.msg_type == BEP9MsgType.DATA:
                             if msg.piece != i:
                                 self.error(
                                     "received data for info piece"
@@ -312,11 +304,11 @@ class PeerConnection(AsyncResource):
                             except ValueError as e:
                                 self.error(f"bad info piece: {e}")
                             break
-                        elif msg.msg_type is BEP9MsgType.REJECT:
+                        elif msg.msg_type == BEP9MsgType.REJECT:
                             self.error(
                                 f"Peer rejected request for info piece {msg.piece}"
                             )
-                        elif msg.msg_type is BEP9MsgType.REQUEST:
+                        elif msg.msg_type == BEP9MsgType.REQUEST:
                             log.log(
                                 TRACE,
                                 "%s sent request for info piece %d; rejecting",
@@ -329,10 +321,12 @@ class PeerConnection(AsyncResource):
                                 )
                             )
                         else:
-                            ### TODO: Do nothing?  Debug-log?
-                            self.error(
-                                "received ut_metadata message with"
-                                f" unexpected msg_type {msg.msg_type.name!r}"
+                            log.log(
+                                TRACE,
+                                "%s sent ut_metadata message with unknown"
+                                " msg_type %d; ignoring",
+                                self.peer,
+                                msg.msg_type,
                             )
         log.debug("All info pieces received from %s; validating ...", self.peer)
         if (good_dgst := self.info_hash.as_hex) != (dgst := info_piecer.get_digest()):

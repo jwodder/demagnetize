@@ -8,7 +8,7 @@ from typing import Any, ClassVar, Optional, Union
 import attr
 from .extensions import BEP9MsgType, BEP10Extension, BEP10Registry, Extension
 from ..bencode import bencode, partial_unbencode, unbencode
-from ..errors import UnbencodeError, UnknownBEP9MsgType
+from ..errors import UnbencodeError
 from ..util import InfoHash, get_string, get_typed_value
 
 
@@ -474,13 +474,17 @@ class ExtendedMessage(ABC):
 class BEP9Message(ExtendedMessage):
     EXTENSION: ClassVar[BEP10Extension] = BEP10Extension.METADATA
 
-    msg_type: BEP9MsgType
+    msg_type: int
     piece: int
     total_size: Optional[int] = None
     payload: bytes = b""
 
     def __str__(self) -> str:
-        return f"ut_metadata message ({self.msg_type.name} piece {self.piece})"
+        try:
+            typename = BEP9MsgType(self.msg_type).name
+        except ValueError:
+            typename = f"msg_type {self.msg_type}"
+        return f"ut_metadata message ({typename} piece {self.piece})"
 
     @classmethod
     def from_extended_payload(cls, payload: bytes) -> BEP9Message:
@@ -490,22 +494,23 @@ class BEP9Message(ExtendedMessage):
             raise ValueError("ut_metadata message does not start with valid bencode")
         if not isinstance(data, dict):
             raise ValueError("ut_metadata message does not start with a dict")
-        if not isinstance(mt := data.get(b"msg_type"), int):
+        if not isinstance(msg_type := data.get(b"msg_type"), int):
             raise ValueError("ut_metadata message lacks valid 'msg_type' field")
-        try:
-            msg_type = BEP9MsgType(mt)
-        except ValueError:
-            raise UnknownBEP9MsgType(mt)
         if not isinstance(piece := data.get(b"piece"), int):
             raise ValueError("ut_metadata message lacks valid 'piece' field")
         total_size = data.get(b"total_size")
         if total_size is not None and not isinstance(total_size, int):
             raise ValueError("ut_metadata message has invalid 'total_size' field")
-        if msg_type != BEP9MsgType.DATA:
-            if trailing:
-                raise ValueError("Non-data ut_metadata message has trailing bytes")
-        elif not trailing:
-            raise ValueError("ut_metadata data message lacks trailing data")
+        try:
+            mt = BEP9MsgType(msg_type)
+        except ValueError:
+            pass
+        else:
+            if mt is not BEP9MsgType.DATA:
+                if trailing:
+                    raise ValueError("Non-data ut_metadata message has trailing bytes")
+            elif not trailing:
+                raise ValueError("ut_metadata data message lacks trailing data")
         return cls(
             msg_type=msg_type,
             piece=piece,
@@ -514,7 +519,7 @@ class BEP9Message(ExtendedMessage):
         )
 
     def to_extended_payload(self) -> bytes:
-        data = {b"msg_type": self.msg_type.value, b"piece": self.piece}
+        data = {b"msg_type": self.msg_type, b"piece": self.piece}
         if self.total_size is not None:
             data[b"total_size"] = self.total_size
         return bencode(data) + self.payload
