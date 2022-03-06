@@ -231,7 +231,7 @@ def raise_error_response(resp: bytes) -> None:
 
 
 def parse_connection_response(transaction_id: int, resp: bytes) -> int:
-    # Returns connection ID or error
+    # Returns connection ID or raises error
     raise_error_response(resp)
     action, xaction_id, connection_id = struct.unpack_from("!iiq", resp)
     # Use `struct.unpack_from()` instead of `unpack()` because "Clients ...
@@ -258,6 +258,7 @@ def build_announce_request(
     downloaded: int,
     uploaded: int,
     left: int,
+    numwant: int = NUMWANT,
 ) -> bytes:
     ip_address = b"\0\0\0\0"
     return (
@@ -267,7 +268,7 @@ def build_announce_request(
         + struct.pack("!qqqi", downloaded, left, uploaded, event.udp_value)
         + ip_address
         + bytes(key)
-        + struct.pack("!iH", NUMWANT, peer_port)
+        + struct.pack("!iH", numwant, peer_port)
     )
 
 
