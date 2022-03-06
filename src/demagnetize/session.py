@@ -112,6 +112,6 @@ class TorrentSession:
                         e.msg,
                     )
                 else:
-                    log.info("Received info from %s", peer)
+                    log.info("Received info for %s from %s", self.info_hash, peer)
                     info_fetched.set()
                     await info_sender.send(info)
