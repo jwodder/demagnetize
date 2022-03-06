@@ -85,10 +85,10 @@ class HTTPTrackerSession(TrackerSession):
                 info_hash=info_hash,
                 msg=f"Request to tracker returned {r.status_code}",
             )
-        log.log(TRACE, "%s replied with: %r", self.tracker, r.content)
         try:
             response = HTTPAnnounceResponse.parse(r.content)
         except ValueError as e:
+            log.log(TRACE, "Bad response from %s: %r", self.tracker, r.content)
             raise TrackerError(
                 tracker=self.tracker, info_hash=info_hash, msg=f"Bad response: {e}"
             )

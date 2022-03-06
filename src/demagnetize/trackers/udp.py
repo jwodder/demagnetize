@@ -76,6 +76,7 @@ class UDPTrackerSession(TrackerSession):
 
     async def get_connection(self) -> Connection:
         if self.connection is None:
+            log.log(TRACE, "Sending connection request to %s", self.tracker)
             transaction_id = make_transaction_id()
             conn_id = await self.send_receive(
                 build_connection_request(transaction_id),
@@ -128,7 +129,6 @@ class UDPTrackerSession(TrackerSession):
             with ctx:
                 n = 0
                 while True:
-                    log.log(TRACE, "Sending to %s: %r", self.tracker, msg)
                     await self.socket.send(msg)
                     try:
                         with fail_after(15 << n):
@@ -144,12 +144,12 @@ class UDPTrackerSession(TrackerSession):
                             ### previous connections & connection attempts?
                             n += 1
                         continue
-                    log.log(TRACE, "%s responded with: %r", self.tracker, resp)
                     try:
                         data = response_parser(resp)
                     except TrackerFailure:
                         raise
                     except Exception as e:
+                        log.log(TRACE, "Bad response from %s: %r", self.tracker, resp)
                         log.log(
                             TRACE,
                             "Response from %s was invalid, will resend: %s: %s",
