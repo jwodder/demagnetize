@@ -4,9 +4,9 @@ from collections import deque
 from functools import reduce
 from operator import or_
 import struct
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar, Optional, Union
 import attr
-from .extensions import BEP9MsgType, BEP10Registry, Extension
+from .extensions import BEP9MsgType, BEP10Extension, BEP10Registry, Extension
 from ..bencode import bencode, partial_unbencode, unbencode
 from ..errors import UnbencodeError, UnknownBEP9MsgType
 from ..util import InfoHash, get_string, get_typed_value
@@ -33,7 +33,7 @@ class Handshake:
     def parse(cls, blob: bytes) -> Handshake:
         if len(blob) != cls.LENGTH:
             raise ValueError(
-                f"handshake wrong length; got {len(blob)}, expected {cls.LENGTH}"
+                f"handshake wrong length; got {len(blob)} bytes, expected {cls.LENGTH}"
             )
         if blob[: len(cls.HEADER)] != cls.HEADER:
             raise ValueError("handshake had invalid protocol declaration")
@@ -377,10 +377,28 @@ class Extended(Message):
     def to_payload(self) -> bytes:
         return bytes([self.msg_id]) + self.payload
 
+    def decompose(
+        self, extensions: BEP10Registry
+    ) -> ExtendedHandshake | ExtendedMessage:
+        if self.msg_id == 0:
+            return ExtendedHandshake.from_extended_payload(self.payload)
+        else:
+            try:
+                ext = extensions.from_code[self.msg_id]
+            except KeyError:
+                raise ValueError(f"Unknown extended message ID {self.msg_id}")
+            for klass in ExtendedMessage.__subclasses__():
+                if klass.EXTENSION == ext:
+                    return klass.from_extended_payload(self.payload)
+            raise ValueError(f"Unimplemented extended message ID {self.msg_id}")
+
 
 @attr.define
 class ExtendedHandshake:
     data: dict
+
+    def __str__(self) -> str:
+        return "extended handshake"
 
     @classmethod
     def make(
@@ -397,7 +415,7 @@ class ExtendedHandshake:
         return cls(data)
 
     @classmethod
-    def parse(cls, payload: bytes) -> ExtendedHandshake:
+    def from_extended_payload(cls, payload: bytes) -> ExtendedHandshake:
         try:
             data = unbencode(payload)
         except UnbencodeError:
@@ -407,6 +425,12 @@ class ExtendedHandshake:
         if not isinstance(data.get(b"m"), dict):
             raise ValueError("'m' dictionary missing")
         return cls(data)
+
+    def to_extended_payload(self) -> bytes:
+        return bencode(self.data)
+
+    def to_extended(self) -> Extended:
+        return Extended(msg_id=0, payload=self.to_extended_payload())
 
     @property
     def extension_names(self) -> list[str]:
@@ -428,19 +452,38 @@ class ExtendedHandshake:
     def metadata_size(self) -> Optional[int]:
         return get_typed_value(self.data, b"metadata_size", int)
 
-    def compose(self) -> Extended:
-        return Extended(msg_id=0, payload=bencode(self.data))
+
+class ExtendedMessage(ABC):
+    EXTENSION: ClassVar[BEP10Extension]
+
+    @classmethod
+    @abstractmethod
+    def from_extended_payload(cls, payload: bytes) -> ExtendedMessage:
+        ...
+
+    @abstractmethod
+    def to_extended_payload(self) -> bytes:
+        ...
+
+    def to_extended(self, extensions: BEP10Registry) -> Extended:
+        msg_id = extensions.to_code[self.EXTENSION]
+        return Extended(msg_id=msg_id, payload=self.to_extended_payload())
 
 
 @attr.define
-class BEP9Message:
+class BEP9Message(ExtendedMessage):
+    EXTENSION: ClassVar[BEP10Extension] = BEP10Extension.METADATA
+
     msg_type: BEP9MsgType
     piece: int
     total_size: Optional[int] = None
     payload: bytes = b""
 
+    def __str__(self) -> str:
+        return f"ut_metadata message ({self.msg_type.name} piece {self.piece})"
+
     @classmethod
-    def parse(cls, payload: bytes) -> BEP9Message:
+    def from_extended_payload(cls, payload: bytes) -> BEP9Message:
         try:
             data, trailing = partial_unbencode(payload)
         except UnbencodeError:
@@ -470,9 +513,11 @@ class BEP9Message:
             payload=trailing,
         )
 
-    def compose(self, msg_id: int) -> Extended:
+    def to_extended_payload(self) -> bytes:
         data = {b"msg_type": self.msg_type.value, b"piece": self.piece}
         if self.total_size is not None:
             data[b"total_size"] = self.total_size
-        benc = bencode(data)
-        return Extended(msg_id=msg_id, payload=benc + self.payload)
+        return bencode(data) + self.payload
+
+
+MessageType = Union[Message, ExtendedHandshake, ExtendedMessage]

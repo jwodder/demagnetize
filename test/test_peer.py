@@ -206,8 +206,8 @@ def test_extended_handshake(
     client: Optional[str],
     metadata_size: Optional[int],
 ) -> None:
-    assert ExtendedHandshake.parse(payload) == handshake
-    assert handshake.compose() == Extended(0, payload)
+    assert ExtendedHandshake.from_extended_payload(payload) == handshake
+    assert handshake.to_extended() == Extended(0, payload)
     assert handshake.extensions == extensions
     assert handshake.extension_names == extension_names
     assert handshake.client == client
@@ -241,5 +241,6 @@ def test_extended_handshake(
     ],
 )
 def test_bep9_message(ext: Extended, b9msg: BEP9Message, msg_id: int) -> None:
-    assert BEP9Message.parse(ext.payload) == b9msg
-    assert b9msg.compose(msg_id) == ext
+    extensions = BEP10Registry.from_dict({BEP10Extension.METADATA: msg_id})
+    assert ext.decompose(extensions) == b9msg
+    assert b9msg.to_extended(extensions) == ext
