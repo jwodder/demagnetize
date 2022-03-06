@@ -52,6 +52,7 @@ def test_bencode(blob: bytes, data: Any) -> None:
         b"i12 e",
         b"i12:",
         b"5eapple",
+        b"l" * 1234 + b"e" * 1234,
     ],
 )
 def test_unbencode_error(blob: bytes) -> None:

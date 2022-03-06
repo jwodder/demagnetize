@@ -93,14 +93,16 @@ class Unbencoder:
 
 
 def unbencode(blob: bytes) -> Any:
-    decoder = Unbencoder(blob)
-    value = decoder.decode_next()
-    if decoder.get_trailing():
+    (value, trailing) = partial_unbencode(blob)
+    if trailing:
         raise UnbencodeError("Input contains trailing bytes")
     return value
 
 
 def partial_unbencode(blob: bytes) -> tuple[Any, bytes]:
     decoder = Unbencoder(blob)
-    value = decoder.decode_next()
+    try:
+        value = decoder.decode_next()
+    except RecursionError:
+        raise UnbencodeError("Too many nested structures")
     return (value, decoder.get_trailing())
