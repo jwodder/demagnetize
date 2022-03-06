@@ -156,7 +156,10 @@ class PeerConnection(AsyncResource):
             msg = msg.to_extended()
         elif isinstance(msg, ExtendedMessage):
             msg = msg.to_extended(self.remote_bep10_registry)
-        await self.socket.send(bytes(msg))
+        try:
+            await self.socket.send(bytes(msg))
+        except (BrokenResourceError, ClosedResourceError):
+            self.error("Peer closed the connection early")
 
     async def read(self, length: int) -> bytes:
         try:
@@ -166,15 +169,18 @@ class PeerConnection(AsyncResource):
 
     async def handshake(self) -> None:
         log.log(TRACE, "Sending handshake to %s", self.peer)
-        await self.socket.send(
-            bytes(
-                Handshake(
-                    extensions=set(SUPPORTED_EXTENSIONS),  # set() for mypy
-                    info_hash=self.info_hash,
-                    peer_id=self.app.peer_id,
+        try:
+            await self.socket.send(
+                bytes(
+                    Handshake(
+                        extensions=set(SUPPORTED_EXTENSIONS),  # set() for mypy
+                        info_hash=self.info_hash,
+                        peer_id=self.app.peer_id,
+                    )
                 )
             )
-        )
+        except (BrokenResourceError, ClosedResourceError):
+            self.error("Peer closed the connection early")
         r = await self.read(Handshake.LENGTH)
         try:
             hs = Handshake.parse(r)
@@ -249,7 +255,10 @@ class PeerConnection(AsyncResource):
         while True:
             await sleep(KEEPALIVE_PERIOD)
             log.log(TRACE, "Sending keepalive to %s", self.peer)
-            await self.socket.send(b"\0\0\0\0")
+            try:
+                await self.socket.send(b"\0\0\0\0")
+            except (BrokenResourceError, ClosedResourceError):
+                self.error("Peer closed the connection early")
 
     async def get_info(self) -> dict:
         # Unlike a normal torrent, we expect to get the entire info from a
