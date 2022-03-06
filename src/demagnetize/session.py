@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, AsyncIterator
 from anyio import (
     CapacityLimiter,
     EndOfStream,
+    Event,
     create_memory_object_stream,
     create_task_group,
 )
@@ -89,23 +90,28 @@ class TorrentSession:
         info_sender: MemoryObjectSendStream[dict],
         task_group: TaskGroup,
     ) -> None:
+        info_fetched = Event()
         async with aclosing(peer_aiter), info_sender:
             async for peer in peer_aiter:
-                task_group.start_soon(self._peer_task, peer, info_sender.clone())
+                task_group.start_soon(
+                    self._peer_task, peer, info_sender.clone(), info_fetched
+                )
 
     async def _peer_task(
-        self, peer: Peer, info_sender: MemoryObjectSendStream[dict]
+        self, peer: Peer, info_sender: MemoryObjectSendStream[dict], info_fetched: Event
     ) -> None:
         async with self.peer_limit, info_sender:
-            try:
-                info = await peer.get_info(self.app, self.info_hash)
-            except PeerError as e:
-                log.warning(
-                    "Error getting info for %s from %s: %s",
-                    self.info_hash,
-                    peer,
-                    e.msg,
-                )
-            else:
-                log.info("Received info from %s", peer)
-                await info_sender.send(info)
+            if not info_fetched.is_set():
+                try:
+                    info = await peer.get_info(self.app, self.info_hash)
+                except PeerError as e:
+                    log.warning(
+                        "Error getting info for %s from %s: %s",
+                        self.info_hash,
+                        peer,
+                        e.msg,
+                    )
+                else:
+                    log.info("Received info from %s", peer)
+                    info_fetched.set()
+                    await info_sender.send(info)
