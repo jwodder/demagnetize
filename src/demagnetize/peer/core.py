@@ -313,15 +313,8 @@ class PeerConnection(AsyncResource):
                                 self.error(f"bad info piece: {e}")
                             break
                         elif msg.msg_type is BEP9MsgType.REJECT:
-                            if msg.piece != i:
-                                self.error(
-                                    "received reject for info piece"
-                                    f" {msg.piece}, which we did not request"
-                                )
-                            log.debug(
-                                "%s rejected request for info piece %d",
-                                self.peer,
-                                msg.piece,
+                            self.error(
+                                f"Peer rejected request for info piece {msg.piece}"
                             )
                         elif msg.msg_type is BEP9MsgType.REQUEST:
                             log.log(
