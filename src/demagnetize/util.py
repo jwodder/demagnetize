@@ -1,6 +1,6 @@
 from __future__ import annotations
 from base64 import b32decode
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from hashlib import sha1
 import logging
 from random import choices, randrange
@@ -17,7 +17,7 @@ from typing import (
     TypeVar,
     cast,
 )
-from anyio import Event, create_memory_object_stream, create_task_group
+from anyio import CapacityLimiter, Event, create_memory_object_stream, create_task_group
 from anyio.streams.memory import MemoryObjectSendStream
 import attr
 from torf import Magnet, Torrent
@@ -144,18 +144,27 @@ def make_peer_id() -> bytes:
 
 
 @asynccontextmanager
-async def acollect(coros: Iterable[Awaitable[T]]) -> AsyncIterator[AsyncIterator[T]]:
+async def acollect(
+    coros: Iterable[Awaitable[T]], limit: Optional[CapacityLimiter] = None
+) -> AsyncIterator[AsyncIterator[T]]:
     async with create_task_group() as tg:
         sender, receiver = create_memory_object_stream()
         async with sender:
             for c in coros:
-                tg.start_soon(_acollect_pipe, c, sender.clone())
+                tg.start_soon(_acollect_pipe, c, limit, sender.clone())
         async with receiver:
             yield receiver
 
 
-async def _acollect_pipe(coro: Awaitable[T], sender: MemoryObjectSendStream[T]) -> None:
-    async with sender:
+async def _acollect_pipe(
+    coro: Awaitable[T],
+    limit: Optional[CapacityLimiter],
+    sender: MemoryObjectSendStream[T],
+) -> None:
+    async with AsyncExitStack() as stack:
+        if limit is not None:
+            await stack.enter_async_context(limit)
+        await stack.enter_async_context(sender)
         value = await coro
         await sender.send(value)
 

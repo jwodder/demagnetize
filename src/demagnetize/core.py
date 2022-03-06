@@ -5,13 +5,13 @@ from random import randint
 import sys
 from time import time
 from typing import AsyncIterator
-from anyio import create_memory_object_stream, create_task_group
+from anyio import CapacityLimiter, create_memory_object_stream, create_task_group
 import attr
 import click
 from torf import Magnet, Torrent
 from torf._utils import decode_dict
 from .bencode import bencode
-from .consts import CLIENT
+from .consts import CLIENT, MAGNET_LIMIT
 from .errors import DemagnetizeError
 from .peer import Peer
 from .session import TorrentSession
@@ -49,7 +49,7 @@ class Demagnetizer:
     ) -> Report:
         report = Report()
         coros = [self.demagnetize2file(m, fntemplate) for m in magnets]
-        async with acollect(coros) as ait:
+        async with acollect(coros, limit=CapacityLimiter(MAGNET_LIMIT)) as ait:
             async for r in ait:
                 report += r
         return report

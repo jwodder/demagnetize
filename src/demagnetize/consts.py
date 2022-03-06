@@ -38,3 +38,6 @@ PEERS_PER_MAGNET_LIMIT = 30
 
 #: Timeout for connecting to a peer
 PEER_CONNECT_TIMEOUT = 5
+
+#: Maximum number of magnet URLs to operate on at once in batch mode
+MAGNET_LIMIT = 50
