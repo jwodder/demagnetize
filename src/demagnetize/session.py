@@ -1,6 +1,7 @@
 from __future__ import annotations
+from collections.abc import AsyncGenerator
 import sys
-from typing import TYPE_CHECKING, AsyncIterator
+from typing import TYPE_CHECKING
 from anyio import (
     CapacityLimiter,
     EndOfStream,
@@ -64,7 +65,7 @@ class TorrentSession:
             tg.cancel_scope.cancel()
             return md
 
-    async def get_all_peers(self, task_group: TaskGroup) -> AsyncIterator[Peer]:
+    async def get_all_peers(self, task_group: TaskGroup) -> AsyncGenerator[Peer, None]:
         sender, receiver = create_memory_object_stream()
         async with sender:
             for url in self.magnet.tr:
@@ -86,7 +87,7 @@ class TorrentSession:
 
     async def _peer_pipe(
         self,
-        peer_aiter: AsyncIterator[Peer],
+        peer_aiter: AsyncGenerator[Peer, None],
         info_sender: MemoryObjectSendStream[dict],
         task_group: TaskGroup,
     ) -> None:

@@ -1,7 +1,8 @@
 from __future__ import annotations
+from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
 import sys
-from typing import TYPE_CHECKING, Any, AsyncIterator, NoReturn, Optional, Tuple
+from typing import TYPE_CHECKING, Any, NoReturn, Optional, Tuple
 from anyio import (
     BrokenResourceError,
     CancelScope,
@@ -214,7 +215,7 @@ class PeerConnection(AsyncResource):
         self.task_group.start_soon(self.handle_messages)
         self.task_group.start_soon(self.send_keepalives)
 
-    async def aiter_messages(self) -> AsyncIterator[MessageType]:
+    async def aiter_messages(self) -> AsyncGenerator[MessageType, None]:
         while True:
             try:
                 blen = await self.read(4)

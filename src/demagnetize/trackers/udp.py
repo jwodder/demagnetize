@@ -1,20 +1,13 @@
 # <https://www.bittorrent.org/beps/bep_0015.html>
 from __future__ import annotations
-from contextlib import nullcontext
+from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 from functools import partial
 from random import randint
 from socket import AF_INET6
 import struct
 from time import time
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    ClassVar,
-    ContextManager,
-    Optional,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Any, ClassVar, Optional, TypeVar
 from anyio import create_connected_udp_socket, fail_after
 from anyio.abc import ConnectedUDPSocket, SocketAttribute
 import attr
@@ -120,7 +113,7 @@ class UDPTrackerSession(TrackerSession):
         response_parser: Callable[[bytes], T],
         expiration: Optional[float] = None,
     ) -> T:
-        ctx: ContextManager[Any]
+        ctx: AbstractContextManager[Any]
         if expiration is None:
             ctx = nullcontext()
         else:

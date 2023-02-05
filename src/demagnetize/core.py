@@ -1,10 +1,10 @@
 from __future__ import annotations
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from random import randint
 import sys
 from time import time
-from typing import AsyncIterator
 from anyio import CapacityLimiter, create_memory_object_stream, create_task_group
 import attr
 import click

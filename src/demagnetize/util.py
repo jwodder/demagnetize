@@ -1,22 +1,13 @@
 from __future__ import annotations
 from base64 import b32decode
+from collections.abc import AsyncIterator, Awaitable, Iterable, Iterator
 from contextlib import AsyncExitStack, asynccontextmanager
 from hashlib import sha1
 import logging
 from random import choices, randrange
 import re
 from string import ascii_letters, digits
-from typing import (
-    Any,
-    AsyncIterator,
-    Awaitable,
-    Generic,
-    Iterable,
-    Iterator,
-    Optional,
-    TypeVar,
-    cast,
-)
+from typing import Any, Generic, Optional, TypeVar, cast
 from anyio import CapacityLimiter, Event, create_memory_object_stream, create_task_group
 from anyio.streams.memory import MemoryObjectSendStream
 import attr
