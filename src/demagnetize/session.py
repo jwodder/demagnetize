@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections.abc import AsyncGenerator
-import sys
+from contextlib import aclosing
 from typing import TYPE_CHECKING
 from anyio import (
     CapacityLimiter,
@@ -18,11 +18,6 @@ from .errors import DemagnetizeError, PeerError
 from .peer import Peer, PeerAddress
 from .trackers import Tracker
 from .util import InfoHash, log
-
-if sys.version_info >= (3, 10):
-    from contextlib import aclosing
-else:
-    from async_generator import aclosing
 
 if TYPE_CHECKING:
     from .core import Demagnetizer

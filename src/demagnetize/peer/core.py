@@ -1,8 +1,7 @@
 from __future__ import annotations
 from collections.abc import AsyncGenerator, AsyncIterator
-from contextlib import asynccontextmanager
-import sys
-from typing import TYPE_CHECKING, Any, NoReturn, Optional, Tuple
+from contextlib import aclosing, asynccontextmanager
+from typing import TYPE_CHECKING, Any, NoReturn, Optional
 from anyio import (
     BrokenResourceError,
     CancelScope,
@@ -47,11 +46,6 @@ from ..consts import (
 from ..errors import CellClosedError, PeerError, UnbencodeError
 from ..util import TRACE, AsyncCell, InfoHash, InfoPiecer, log
 
-if sys.version_info >= (3, 10):
-    from contextlib import aclosing
-else:
-    from async_generator import aclosing
-
 if TYPE_CHECKING:
     from ..core import Demagnetizer
 
@@ -64,7 +58,7 @@ LOCAL_BEP10_REGISTRY = BEP10Registry.from_dict(
     }
 )
 
-PeerAddress = Tuple[str, int]  # Can't be written as "tuple[str, int]" in 3.8
+PeerAddress = tuple[str, int]
 
 
 @attr.define

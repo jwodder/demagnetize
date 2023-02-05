@@ -4,7 +4,7 @@ from collections import deque
 from functools import reduce
 from operator import or_
 import struct
-from typing import Any, ClassVar, Optional, Union
+from typing import Any, ClassVar, Optional
 import attr
 from .extensions import BEP9MsgType, BEP10Extension, BEP10Registry, Extension
 from ..bencode import bencode, partial_unbencode, unbencode
@@ -525,4 +525,4 @@ class BEP9Message(ExtendedMessage):
         return bencode(data) + self.payload
 
 
-MessageType = Union[Message, ExtendedHandshake, ExtendedMessage]
+MessageType = Message | ExtendedHandshake | ExtendedMessage

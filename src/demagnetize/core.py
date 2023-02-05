@@ -1,9 +1,8 @@
 from __future__ import annotations
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import aclosing, asynccontextmanager
 from pathlib import Path
 from random import randint
-import sys
 from time import time
 from anyio import CapacityLimiter, create_memory_object_stream, create_task_group
 import attr
@@ -26,11 +25,6 @@ from .util import (
     make_peer_id,
     template_torrent_filename,
 )
-
-if sys.version_info >= (3, 10):
-    from contextlib import aclosing
-else:
-    from async_generator import aclosing
 
 
 @attr.define
