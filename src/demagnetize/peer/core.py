@@ -71,7 +71,7 @@ PeerAddress = Tuple[str, int]  # Can't be written as "tuple[str, int]" in 3.8
 class Peer:
     host: str
     port: int
-    id: Optional[bytes] = None
+    id: Optional[bytes] = None  # noqa: A003
 
     def __str__(self) -> str:
         if ":" in self.host:

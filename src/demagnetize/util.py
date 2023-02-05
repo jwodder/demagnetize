@@ -166,7 +166,7 @@ class AsyncCell(Generic[T]):
     value: Optional[T] = None
     failed: bool = False
 
-    def set(self, value: T) -> None:
+    def set(self, value: T) -> None:  # noqa: A003
         if self.event.is_set():
             raise RuntimeError("AsyncCell set more than once")
         self.value = value

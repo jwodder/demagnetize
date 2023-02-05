@@ -159,7 +159,7 @@ class UDPTrackerSession(TrackerSession):
 @attr.define
 class Connection:
     session: UDPTrackerSession
-    id: int
+    id: int  # noqa: A003
     expiration: float = attr.field(init=False)
 
     def __attrs_post_init__(self) -> None:
