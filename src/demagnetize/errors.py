@@ -36,10 +36,6 @@ class UnbencodeError(ValueError):
     pass
 
 
-class CellClosedError(Exception):
-    pass
-
-
 class TrackerFailure(Exception):
     # Raised when tracker returns a failure message
     ### TODO: Come up with a better name?

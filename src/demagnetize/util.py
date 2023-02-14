@@ -7,13 +7,12 @@ import logging
 from random import choices, randrange
 import re
 from string import ascii_letters, digits
-from typing import Any, Generic, Optional, TypeVar, cast
-from anyio import CapacityLimiter, Event, create_memory_object_stream, create_task_group
+from typing import Any, Optional, TypeVar, cast
+from anyio import CapacityLimiter, create_memory_object_stream, create_task_group
 from anyio.streams.memory import MemoryObjectSendStream
 import attr
 from torf import Magnet, Torrent
 from .consts import INFO_CHUNK_SIZE, PEER_ID_PREFIX
-from .errors import CellClosedError
 
 log = logging.getLogger(__package__)
 
@@ -158,31 +157,6 @@ async def _acollect_pipe(
         await stack.enter_async_context(sender)
         value = await coro
         await sender.send(value)
-
-
-@attr.define
-class AsyncCell(Generic[T]):
-    event: Event = attr.Factory(Event)
-    value: Optional[T] = None
-    failed: bool = False
-
-    def set(self, value: T) -> None:  # noqa: A003
-        if self.event.is_set():
-            raise RuntimeError("AsyncCell set more than once")
-        self.value = value
-        self.event.set()
-
-    async def get(self) -> T:
-        await self.event.wait()
-        if self.failed:
-            raise CellClosedError()
-        else:
-            return cast(T, self.value)
-
-    def close(self) -> None:
-        if not self.event.is_set():
-            self.failed = True
-            self.event.set()
 
 
 @attr.define

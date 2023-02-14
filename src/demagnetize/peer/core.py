@@ -14,7 +14,13 @@ from anyio import (
     fail_after,
     sleep,
 )
-from anyio.abc import AsyncResource, SocketStream, TaskGroup
+from anyio.abc import (
+    AsyncResource,
+    ObjectReceiveStream,
+    ObjectSendStream,
+    SocketStream,
+    TaskGroup,
+)
 from anyio.streams.buffered import BufferedByteReceiveStream
 import attr
 from morecontext import additem
@@ -43,8 +49,8 @@ from ..consts import (
     PEER_CONNECT_TIMEOUT,
     UT_METADATA,
 )
-from ..errors import CellClosedError, PeerError, UnbencodeError
-from ..util import TRACE, AsyncCell, InfoHash, InfoPiecer, log
+from ..errors import PeerError, UnbencodeError
+from ..util import TRACE, InfoHash, InfoPiecer, log
 
 if TYPE_CHECKING:
     from ..core import Demagnetizer
@@ -131,13 +137,20 @@ class PeerConnection(AsyncResource):
     info_hash: InfoHash
     task_group: TaskGroup
     extensions: set[Extension] = attr.Factory(set)
-    bep10_handshake: AsyncCell[ExtendedHandshake] = attr.Factory(AsyncCell)
+    bep10_handshake_receiver: ObjectReceiveStream[ExtendedHandshake] = attr.ib(
+        init=False
+    )
+    bep10_handshake_sender: ObjectSendStream[ExtendedHandshake] = attr.ib(init=False)
     remote_bep10_registry: BEP10Registry = attr.Factory(BEP10Registry)
     subscribers: list[Subscriber] = attr.Factory(list)
     readstream: BufferedByteReceiveStream = attr.field(init=False)
 
     def __attrs_post_init__(self) -> None:
         self.readstream = BufferedByteReceiveStream(self.socket)
+        (
+            self.bep10_handshake_sender,
+            self.bep10_handshake_receiver,
+        ) = create_memory_object_stream(0, ExtendedHandshake)
 
     async def aclose(self) -> None:
         with CancelScope(shield=True):
@@ -262,8 +275,8 @@ class PeerConnection(AsyncResource):
         # they can't send it all, why should we trust them?)
         try:
             ### TODO: Put a timeout on this:
-            handshake = await self.bep10_handshake.get()
-        except CellClosedError:
+            handshake = await self.bep10_handshake_receiver.receive()
+        except Exception:
             self.error("Abandoned connection")
         self.remote_bep10_registry = handshake.extensions
         if BEP10Extension.METADATA not in self.remote_bep10_registry:

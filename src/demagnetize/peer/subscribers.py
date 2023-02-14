@@ -57,13 +57,13 @@ class ExtendedHandshakeSubscriber(Subscriber):
                 ", ".join(msg.extension_names) or "<none>",
                 extra,
             )
-            self.conn.bep10_handshake.set(msg)
+            await self.conn.bep10_handshake_sender.send(msg)
             return True
         else:
             return False
 
     async def aclose(self) -> None:
-        self.conn.bep10_handshake.close()
+        await self.conn.bep10_handshake_sender.aclose()
 
 
 @attr.define
