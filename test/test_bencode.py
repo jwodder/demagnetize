@@ -11,6 +11,7 @@ from demagnetize.errors import UnbencodeError
         (b"i3e", 3),
         (b"l4:spam4:eggse", [b"spam", b"eggs"]),
         (b"d3:cow3:moo4:spam4:eggse", {b"cow": b"moo", b"spam": b"eggs"}),
+        (b"d4:data4:\x00\x01\x02\x03e", {b"data": b"\x00\x01\x02\x03"}),
         (b"i0e", 0),
         (b"i-1e", -1),
         (b"i-10e", -10),
