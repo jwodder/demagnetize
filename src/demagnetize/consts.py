@@ -21,9 +21,6 @@ UT_METADATA = 42
 #: Maximum length of a message to accept from a peer
 MAX_PEER_MSG_LEN = 65535
 
-#: Number of seconds between transmissions of "keepalive" messages to peers
-KEEPALIVE_PERIOD = 120
-
 #: Size of BEP 9 "data" message payloads
 INFO_CHUNK_SIZE = 16 << 10
 

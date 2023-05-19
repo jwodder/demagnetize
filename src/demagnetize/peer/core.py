@@ -12,7 +12,6 @@ from anyio import (
     create_memory_object_stream,
     create_task_group,
     fail_after,
-    sleep,
 )
 from anyio.abc import (
     AsyncResource,
@@ -42,13 +41,7 @@ from .subscribers import (
     Subscriber,
 )
 from ..bencode import unbencode
-from ..consts import (
-    CLIENT,
-    KEEPALIVE_PERIOD,
-    MAX_PEER_MSG_LEN,
-    PEER_CONNECT_TIMEOUT,
-    UT_METADATA,
-)
+from ..consts import CLIENT, MAX_PEER_MSG_LEN, PEER_CONNECT_TIMEOUT, UT_METADATA
 from ..errors import PeerError, UnbencodeError
 from ..util import TRACE, InfoHash, InfoPiecer, log
 
@@ -220,7 +213,6 @@ class PeerConnection(AsyncResource):
     def start_tasks(self) -> None:
         self.subscribers.append(MessageSink())
         self.task_group.start_soon(self.handle_messages)
-        self.task_group.start_soon(self.send_keepalives)
 
     async def aiter_messages(self) -> AsyncGenerator[MessageType, None]:
         while True:
@@ -258,15 +250,6 @@ class PeerConnection(AsyncResource):
                         handled = True
                 if not handled:
                     self.error(f"Peer sent unexpected message: {msg}")
-
-    async def send_keepalives(self) -> None:
-        while True:
-            await sleep(KEEPALIVE_PERIOD)
-            log.log(TRACE, "Sending keepalive to %s", self.peer)
-            try:
-                await self.socket.send(b"\0\0\0\0")
-            except (BrokenResourceError, ClosedResourceError):
-                self.error("Peer closed the connection early")
 
     async def get_info(self) -> dict:
         # Unlike a normal torrent, we expect to get the entire info from a
