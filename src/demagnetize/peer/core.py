@@ -1,44 +1,34 @@
 from __future__ import annotations
-from collections.abc import AsyncGenerator, AsyncIterator
-from contextlib import aclosing, asynccontextmanager
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, NoReturn, Optional
 from anyio import (
     BrokenResourceError,
-    CancelScope,
     ClosedResourceError,
     EndOfStream,
     IncompleteRead,
     connect_tcp,
-    create_memory_object_stream,
-    create_task_group,
     fail_after,
 )
-from anyio.abc import (
-    AsyncResource,
-    ObjectReceiveStream,
-    ObjectSendStream,
-    SocketStream,
-    TaskGroup,
-)
+from anyio.abc import ObjectStream, SocketStream
 from anyio.streams.buffered import BufferedByteReceiveStream
 import attr
-from morecontext import additem
 from .extensions import BEP9MsgType, BEP10Extension, BEP10Registry, Extension
 from .messages import (
+    AllowedFast,
     BEP9Message,
+    Bitfield,
+    EmptyMessage,
     Extended,
     ExtendedHandshake,
     ExtendedMessage,
     Handshake,
+    Have,
     HaveNone,
     Message,
     MessageType,
-)
-from .subscribers import (
-    BEP9MessageChanneller,
-    ExtendedHandshakeSubscriber,
-    MessageSink,
-    Subscriber,
+    Piece,
+    Suggest,
 )
 from ..bencode import unbencode
 from ..consts import CLIENT, MAX_PEER_MSG_LEN, PEER_CONNECT_TIMEOUT, UT_METADATA
@@ -56,6 +46,8 @@ LOCAL_BEP10_REGISTRY = BEP10Registry.from_dict(
         BEP10Extension.METADATA: UT_METADATA,
     }
 )
+
+IGNORED_MESSAGES = (EmptyMessage, Have, Bitfield, Piece, AllowedFast, Suggest)
 
 PeerAddress = tuple[str, int]
 
@@ -88,8 +80,8 @@ class Peer:
     async def get_info(self, app: Demagnetizer, info_hash: InfoHash) -> dict:
         log.info("Requesting info for %s from %s", info_hash, self)
         try:
-            async with self.connect(app, info_hash) as connpeer:
-                return await connpeer.get_info()
+            async with self.connect(app, info_hash) as conn:
+                return await get_metadata_info(conn)
         except OSError as e:
             raise PeerError(
                 peer=self,
@@ -113,43 +105,28 @@ class Peer:
             )
         async with s:
             log.debug("Connected to %s", self)
-            async with create_task_group() as tg:
-                async with PeerConnection(
-                    peer=self, app=app, socket=s, info_hash=info_hash, task_group=tg
-                ) as conn:
-                    await conn.handshake()
-                    conn.start_tasks()
-                    yield conn
+            async with PeerConnection(
+                peer=self, app=app, socket=s, info_hash=info_hash
+            ) as conn:
+                await conn.handshake()
+                yield conn
 
 
 @attr.define
-class PeerConnection(AsyncResource):
+class PeerConnection(ObjectStream[MessageType]):
     peer: Peer
     app: Demagnetizer
     socket: SocketStream
     info_hash: InfoHash
-    task_group: TaskGroup
-    extensions: set[Extension] = attr.Factory(set)
-    bep10_handshake_receiver: ObjectReceiveStream[ExtendedHandshake] = attr.ib(
-        init=False
-    )
-    bep10_handshake_sender: ObjectSendStream[ExtendedHandshake] = attr.ib(init=False)
-    remote_bep10_registry: BEP10Registry = attr.Factory(BEP10Registry)
-    subscribers: list[Subscriber] = attr.Factory(list)
     readstream: BufferedByteReceiveStream = attr.field(init=False)
+    extensions: set[Extension] = attr.Factory(set)
+    remote_bep10_registry: BEP10Registry = attr.Factory(BEP10Registry)
 
     def __attrs_post_init__(self) -> None:
         self.readstream = BufferedByteReceiveStream(self.socket)
-        (
-            self.bep10_handshake_sender,
-            self.bep10_handshake_receiver,
-        ) = create_memory_object_stream(0, ExtendedHandshake)
 
     async def aclose(self) -> None:
-        with CancelScope(shield=True):
-            for s in self.subscribers:
-                await s.aclose()
-            self.task_group.cancel_scope.cancel()
+        await self.socket.aclose()
 
     async def send(self, msg: MessageType) -> None:
         log.log(TRACE, "Sending to %s: %s", self.peer, msg)
@@ -161,6 +138,9 @@ class PeerConnection(AsyncResource):
             await self.socket.send(bytes(msg))
         except (BrokenResourceError, ClosedResourceError):
             self.error("Peer closed the connection early")
+
+    async def send_eof(self) -> None:
+        await self.socket.send_eof()
 
     async def read(self, length: int) -> bytes:
         try:
@@ -198,7 +178,6 @@ class PeerConnection(AsyncResource):
             self.error(f"Peer replied with wrong info hash (got {hs.info_hash})")
         self.extensions = SUPPORTED_EXTENSIONS & hs.extensions
         if Extension.BEP10_EXTENSIONS in self.extensions:
-            self.subscribers.append(ExtendedHandshakeSubscriber(self))
             await self.send(
                 ExtendedHandshake.make(extensions=LOCAL_BEP10_REGISTRY, client=CLIENT)
             )
@@ -210,16 +189,9 @@ class PeerConnection(AsyncResource):
     def error(self, msg: str) -> NoReturn:
         raise PeerError(peer=self.peer, info_hash=self.info_hash, msg=msg)
 
-    def start_tasks(self) -> None:
-        self.subscribers.append(MessageSink())
-        self.task_group.start_soon(self.handle_messages)
-
-    async def aiter_messages(self) -> AsyncGenerator[MessageType, None]:
+    async def receive(self) -> MessageType:
         while True:
-            try:
-                blen = await self.read(4)
-            except PeerError:
-                return
+            blen = await self.read(4)
             length = int.from_bytes(blen, "big")
             if length > MAX_PEER_MSG_LEN:
                 self.error(
@@ -230,113 +202,116 @@ class PeerConnection(AsyncResource):
                 log.log(TRACE, "%s sent keepalive", self.peer)
             else:
                 payload = await self.read(length)
-            msg: MessageType
-            try:
-                msg = Message.parse(blen + payload)
-                if isinstance(msg, Extended):
-                    msg = msg.decompose(LOCAL_BEP10_REGISTRY)
-            except ValueError as e:
-                log.log(TRACE, "Bad message from %s: %r", self.peer, payload)
-                self.error(f"Peer sent invalid message: {e}")
-            yield msg
+                msg: MessageType
+                try:
+                    msg = Message.parse(blen + payload)
+                    if isinstance(msg, Extended):
+                        msg = msg.decompose(LOCAL_BEP10_REGISTRY)
+                except ValueError as e:
+                    log.log(TRACE, "Bad message from %s: %r", self.peer, payload)
+                    self.error(f"Peer sent invalid message: {e}")
+                else:
+                    log.log(TRACE, "%s sent message: %s", self.peer, msg)
+                    return msg
 
-    async def handle_messages(self) -> None:
-        async with aclosing(self.aiter_messages()) as ait:
-            async for msg in ait:
-                log.log(TRACE, "%s sent message: %s", self.peer, msg)
-                handled = False
-                for s in list(self.subscribers):
-                    if await s.notify(msg):
-                        handled = True
-                if not handled:
-                    self.error(f"Peer sent unexpected message: {msg}")
 
-    async def get_info(self) -> dict:
-        # Unlike a normal torrent, we expect to get the entire info from a
-        # single peer and error if it can't give it to us (because peers should
-        # only be sending any info if they've checked the whole thing, and if
-        # they can't send it all, why should we trust them?)
-        try:
-            ### TODO: Put a timeout on this:
-            handshake = await self.bep10_handshake_receiver.receive()
-        except Exception:
-            self.error("Abandoned connection")
-        self.remote_bep10_registry = handshake.extensions
-        if BEP10Extension.METADATA not in self.remote_bep10_registry:
-            self.error("Peer does not support metadata transfer")
-        if handshake.metadata_size is None:
-            self.error("Peer did not report info size in extended handshake")
+async def get_metadata_info(conn: PeerConnection) -> dict:
+    # Unlike a normal torrent, we expect to get the entire info from a
+    # single peer and error if it can't give it to us (because peers should
+    # only be sending any info if they've checked the whole thing, and if
+    # they can't send it all, why should we trust them?)
+    try:
+        ### TODO: Put a timeout on this:
+        async for msg in conn:
+            if isinstance(msg, ExtendedHandshake):
+                if msg.client is not None:
+                    extra = f"; client: {msg.client}"
+                else:
+                    extra = ""
+                log.debug(
+                    "%s sent BEP 10 extended handshake; extensions: %s%s",
+                    conn.peer,
+                    ", ".join(msg.extension_names) or "<none>",
+                    extra,
+                )
+                handshake = msg
+                break
+            elif not isinstance(msg, IGNORED_MESSAGES):
+                conn.error(f"Peer sent unexpected message: {msg}")
+    except Exception as e:
+        if isinstance(e, PeerError):
+            raise
+        else:
+            conn.error("Abandoned connection")
+    conn.remote_bep10_registry = handshake.extensions
+    if BEP10Extension.METADATA not in conn.remote_bep10_registry:
+        conn.error("Peer does not support metadata transfer")
+    if handshake.metadata_size is None:
+        conn.error("Peer did not report info size in extended handshake")
+    log.debug("%s declares info size as %d bytes", conn.peer, handshake.metadata_size)
+    info_piecer = InfoPiecer(handshake.metadata_size)
+    for i in range(info_piecer.piece_qty):
         log.debug(
-            "%s declares info size as %d bytes", self.peer, handshake.metadata_size
+            "Sending request to %s for info piece %d/%d",
+            conn.peer,
+            i,
+            info_piecer.piece_qty,
         )
-        info_piecer = InfoPiecer(handshake.metadata_size)
-        sender, receiver = create_memory_object_stream(0, BEP9Message)
-        async with sender, receiver:
-            channeller = BEP9MessageChanneller(sender)
-            with additem(self.subscribers, channeller):
-                for i in range(info_piecer.piece_qty):
-                    log.debug(
-                        "Sending request to %s for info piece %d/%d",
-                        self.peer,
-                        i,
-                        info_piecer.piece_qty,
+        await conn.send(BEP9Message(msg_type=BEP9MsgType.REQUEST, piece=i))
+        async for msg in conn:
+            if isinstance(msg, BEP9Message):
+                if msg.msg_type == BEP9MsgType.DATA:
+                    if msg.piece != i:
+                        conn.error(
+                            "received data for info piece"
+                            f" {msg.piece}, which we did not request"
+                        )
+                    elif (
+                        msg.total_size is not None
+                        and msg.total_size != info_piecer.total_size
+                    ):
+                        conn.error(
+                            "'total_size' in info data message"
+                            f" ({msg.total_size}) differs from"
+                            f" previous value ({info_piecer.total_size})"
+                        )
+                    log.debug("%s sent info piece %d", conn.peer, msg.piece)
+                    try:
+                        info_piecer.add_piece(msg.payload)
+                    except ValueError as e:
+                        conn.error(f"bad info piece: {e}")
+                    break
+                elif msg.msg_type == BEP9MsgType.REJECT:
+                    conn.error(f"Peer rejected request for info piece {msg.piece}")
+                elif msg.msg_type == BEP9MsgType.REQUEST:
+                    log.log(
+                        TRACE,
+                        "%s sent request for info piece %d; rejecting",
+                        conn.peer,
+                        msg.piece,
                     )
-                    await self.send(BEP9Message(msg_type=BEP9MsgType.REQUEST, piece=i))
-                    async for msg in receiver:
-                        if msg.msg_type == BEP9MsgType.DATA:
-                            if msg.piece != i:
-                                self.error(
-                                    "received data for info piece"
-                                    f" {msg.piece}, which we did not request"
-                                )
-                            elif (
-                                msg.total_size is not None
-                                and msg.total_size != info_piecer.total_size
-                            ):
-                                self.error(
-                                    "'total_size' in info data message"
-                                    f" ({msg.total_size}) differs from"
-                                    f" previous value ({info_piecer.total_size})"
-                                )
-                            log.debug("%s sent info piece %d", self.peer, msg.piece)
-                            try:
-                                info_piecer.add_piece(msg.payload)
-                            except ValueError as e:
-                                self.error(f"bad info piece: {e}")
-                            break
-                        elif msg.msg_type == BEP9MsgType.REJECT:
-                            self.error(
-                                f"Peer rejected request for info piece {msg.piece}"
-                            )
-                        elif msg.msg_type == BEP9MsgType.REQUEST:
-                            log.log(
-                                TRACE,
-                                "%s sent request for info piece %d; rejecting",
-                                self.peer,
-                                msg.piece,
-                            )
-                            await self.send(
-                                BEP9Message(
-                                    msg_type=BEP9MsgType.REJECT, piece=msg.piece
-                                )
-                            )
-                        else:
-                            log.log(
-                                TRACE,
-                                "%s sent ut_metadata message with unknown"
-                                " msg_type %d; ignoring",
-                                self.peer,
-                                msg.msg_type,
-                            )
-        log.debug("All info pieces received from %s; validating ...", self.peer)
-        if (good_dgst := self.info_hash.as_hex) != (dgst := info_piecer.get_digest()):
-            self.error(
-                f"Received info with invalid digest; expected {good_dgst}, got {dgst}"
-            )
-        data = info_piecer.get_data()
-        try:
-            info = unbencode(data)
-            assert isinstance(info, dict)
-        except (UnbencodeError, AssertionError):
-            self.error("Received invalid bencoded data as info")
-        return info
+                    await conn.send(
+                        BEP9Message(msg_type=BEP9MsgType.REJECT, piece=msg.piece)
+                    )
+                else:
+                    log.log(
+                        TRACE,
+                        "%s sent ut_metadata message with unknown"
+                        " msg_type %d; ignoring",
+                        conn.peer,
+                        msg.msg_type,
+                    )
+            elif not isinstance(msg, IGNORED_MESSAGES):
+                conn.error(f"Peer sent unexpected message: {msg}")
+    log.debug("All info pieces received from %s; validating ...", conn.peer)
+    if (good_dgst := conn.info_hash.as_hex) != (dgst := info_piecer.get_digest()):
+        conn.error(
+            f"Received info with invalid digest; expected {good_dgst}, got {dgst}"
+        )
+    data = info_piecer.get_data()
+    try:
+        info = unbencode(data)
+        assert isinstance(info, dict)
+    except (UnbencodeError, AssertionError):
+        conn.error("Received invalid bencoded data as info")
+    return info
