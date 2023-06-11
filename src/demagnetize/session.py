@@ -32,7 +32,7 @@ class TorrentSession:
     peers_seen: set[PeerAddress] = attr.Factory(set)
 
     def __attrs_post_init__(self) -> None:
-        # torf only accepts magnet URLs with valid info hashes, so this
+        # torf only accepts magnet links with valid info hashes, so this
         # shouldn't fail:
         self.info_hash = InfoHash.from_string(self.magnet.infohash)
         self.peer_limit = CapacityLimiter(PEERS_PER_MAGNET_LIMIT)
@@ -41,7 +41,7 @@ class TorrentSession:
         if not self.magnet.tr:
             raise DemagnetizeError(
                 f"Cannot fetch info for info hash {self.info_hash}: No trackers"
-                " in magnet URL"
+                " in magnet link"
             )
         if self.magnet.dn is not None:
             display = f" ({self.magnet.dn})"

@@ -51,7 +51,7 @@ def main(log_level: int) -> None:
 @click.argument("magnet", type=Magnet.from_string)
 @click.pass_context
 def get(ctx: click.Context, magnet: Magnet, outfile: str) -> None:
-    """Convert a magnet URL to a .torrent file"""
+    """Convert a magnet link to a .torrent file"""
     demagnetizer = Demagnetizer()
     r = anyio.run(demagnetizer.demagnetize2file, magnet, outfile)
     if not r.ok:
@@ -63,7 +63,7 @@ def get(ctx: click.Context, magnet: Magnet, outfile: str) -> None:
 @click.argument("magnetfile", type=click.File())
 @click.pass_context
 def batch(ctx: click.Context, magnetfile: TextIO, outfile: str) -> None:
-    """Convert a collection of magnet URLs to .torrent files"""
+    """Convert a collection of magnet links to .torrent files"""
     magnets: list[Magnet] = []
     ok = True
     with magnetfile:
@@ -71,17 +71,19 @@ def batch(ctx: click.Context, magnetfile: TextIO, outfile: str) -> None:
             try:
                 m = Magnet.from_string(line)
             except ValueError:
-                log.error("Invalid magnet URL: %s", line)
+                log.error("Invalid magnet link: %s", line)
                 ok = False
             else:
                 magnets.append(m)
     if not magnets:
-        log.info("No magnet URLs to fetch")
+        log.info("No magnet links to fetch")
         ctx.exit(0 if ok else 1)
     demagnetizer = Demagnetizer()
     r = anyio.run(demagnetizer.download_torrent_info, magnets, outfile)
     log.info(
-        "%d/%d magnet URLs successfully converted to torrent files", r.finished, r.total
+        "%d/%d magnet links successfully converted to torrent files",
+        r.finished,
+        r.total,
     )
     if not r.ok:
         ctx.exit(1)

@@ -1,5 +1,5 @@
 """
-Convert magnet URLs to .torrent files
+Convert magnet links to .torrent files
 
 Visit <https://github.com/jwodder/demagnetize> for more information.
 """

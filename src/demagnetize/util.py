@@ -73,7 +73,7 @@ class Key:
 
 @attr.define
 class Report:
-    #: Collection of magnet URLs and the files their torrents were saved to
+    #: Collection of magnet links and the files their torrents were saved to
     #: (None if the demagnetization failed)
     downloads: list[tuple[Magnet, Optional[str]]] = attr.Factory(list)
 

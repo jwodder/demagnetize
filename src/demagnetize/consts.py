@@ -8,7 +8,7 @@ CLIENT = f"demagnetize {__version__}"
 PEER_ID_PREFIX = "-DM-0010-"
 
 #: "left" value to use when announcing to a tracker for a torrent we have only
-#: the magnet URL of
+#: the magnet link of
 LEFT = 65535
 # TODO: Look into appropriate values (For comparison, Transmission uses 2^63-1)
 
@@ -36,5 +36,5 @@ PEERS_PER_MAGNET_LIMIT = 30
 #: Timeout for connecting to a peer
 PEER_CONNECT_TIMEOUT = 5
 
-#: Maximum number of magnet URLs to operate on at once in batch mode
+#: Maximum number of magnet links to operate on at once in batch mode
 MAGNET_LIMIT = 50
