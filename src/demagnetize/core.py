@@ -16,7 +16,6 @@ from .peer import Peer
 from .session import TorrentSession
 from .trackers import Tracker
 from .util import (
-    TRACE,
     InfoHash,
     Key,
     Report,
@@ -34,9 +33,9 @@ class Demagnetizer:
     peer_port: int = attr.Factory(lambda: randint(1025, 65535))
 
     def __attrs_post_init__(self) -> None:
-        log.log(TRACE, "Using key = %s", self.key)
-        log.log(TRACE, "Using peer ID = %r", self.peer_id)
-        log.log(TRACE, "Using peer port = %d", self.peer_port)
+        log.debug("Using key = %s", self.key)
+        log.debug("Using peer ID = %r", self.peer_id)
+        log.debug("Using peer port = %d", self.peer_port)
 
     async def download_torrent_info(
         self, magnets: list[Magnet], fntemplate: str
