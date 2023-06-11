@@ -93,7 +93,7 @@ class HTTPTrackerSession(TrackerSession):
                 tracker=self.tracker, info_hash=info_hash, msg=f"Bad response: {e}"
             )
         if response.warning_message is not None:
-            log.info(
+            log.warning(
                 "%s replied with warning: %s", self.tracker, response.warning_message
             )
         return response

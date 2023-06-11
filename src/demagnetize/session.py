@@ -17,7 +17,7 @@ from .consts import PEERS_PER_MAGNET_LIMIT
 from .errors import DemagnetizeError, PeerError
 from .peer import Peer, PeerAddress
 from .trackers import Tracker
-from .util import InfoHash, log
+from .util import TRACE, InfoHash, log
 
 if TYPE_CHECKING:
     from .core import Demagnetizer
@@ -78,7 +78,7 @@ class TorrentSession:
                     self.peers_seen.add(addr)
                     yield p
                 else:
-                    log.debug("%s returned by multiple trackers; skipping", p)
+                    log.log(TRACE, "%s returned by multiple trackers; skipping", p)
 
     async def _peer_pipe(
         self,

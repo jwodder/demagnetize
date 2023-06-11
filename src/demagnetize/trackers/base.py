@@ -57,7 +57,7 @@ class Tracker(ABC):
                     log.debug(
                         "%s returned peers: %s",
                         self,
-                        ", ".join(map(str, peers)),
+                        ", ".join(map(str, peers)) or "<none>",
                     )
                     for p in peers:
                         await sender.send(p)

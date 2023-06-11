@@ -115,7 +115,7 @@ class Peer:
                 msg="Could not connect to peer in time",
             )
         async with s:
-            log.debug("Connected to %s", self)
+            log.log(TRACE, "Connected to %s", self)
             async with PeerConnection(
                 peer=self, app=app, socket=s, info_hash=info_hash
             ) as conn:
@@ -179,13 +179,7 @@ class PeerConnection(ObjectStream[AnyMessage]):
         except ValueError as e:
             log.log(TRACE, "Bad handshake from %s: %r", self.peer, r)
             self.error(f"Peer sent bad handshake: {e}")
-        log.log(
-            TRACE,
-            "%s sent handshake; extensions: %s; peer_id: %r",
-            self.peer,
-            ", ".join(hs.extension_names) or "<none>",
-            hs.peer_id,
-        )
+        log.log(TRACE, "%s sent %s", self.peer, hs)
         if hs.info_hash != self.info_hash:
             self.error(f"Peer replied with wrong info hash (got {hs.info_hash})")
         self.extensions = SUPPORTED_EXTENSIONS & hs.extensions
@@ -232,35 +226,21 @@ async def get_metadata_info(conn: PeerConnection) -> dict:
     # peer and error if it can't give it to us (because peers should only be
     # sending any info if they've checked the whole thing, and if they can't
     # send it all, why should we trust them?)
-    try:
-        ### TODO: Put a timeout on this:
-        async for msg in conn:
-            if isinstance(msg, ExtendedHandshake):
-                if msg.client is not None:
-                    extra = f"; client: {msg.client}"
-                else:
-                    extra = ""
-                log.debug(
-                    "%s sent BEP 10 extended handshake; extensions: %s%s",
-                    conn.peer,
-                    ", ".join(msg.extension_names) or "<none>",
-                    extra,
-                )
-                handshake = msg
-                break
-            elif not isinstance(msg, IGNORED_MESSAGES):
-                conn.error(f"Peer sent unexpected message: {msg}")
-    except Exception as e:
-        if isinstance(e, PeerError):
-            raise
-        else:
-            conn.error("Abandoned connection")
+    ### TODO: Put a timeout on this:
+    async for msg in conn:
+        if isinstance(msg, ExtendedHandshake):
+            handshake = msg
+            break
+        elif not isinstance(msg, IGNORED_MESSAGES):
+            conn.error(f"Peer sent unexpected message: {msg}")
     conn.remote_bep10_registry = handshake.extensions
     if BEP10Extension.METADATA not in conn.remote_bep10_registry:
         conn.error("Peer does not support metadata transfer")
     if handshake.metadata_size is None:
         conn.error("Peer did not report info size in extended handshake")
-    log.debug("%s declares info size as %d bytes", conn.peer, handshake.metadata_size)
+    log.log(
+        TRACE, "%s declares info size as %d bytes", conn.peer, handshake.metadata_size
+    )
     info_piecer = InfoPiecer(handshake.metadata_size)
     for i in range(info_piecer.piece_qty):
         log.debug(

@@ -21,6 +21,10 @@ class Handshake:
     info_hash: InfoHash
     peer_id: bytes
 
+    def __str__(self) -> str:
+        extensions = ", ".join(self.extension_names) or "<none>"
+        return f"handshake; extensions: {extensions}; peer_id: {self.peer_id!r}"
+
     def __bytes__(self) -> bytes:
         return (
             self.HEADER
@@ -398,7 +402,12 @@ class ExtendedHandshake:
     data: dict
 
     def __str__(self) -> str:
-        return "extended handshake"
+        s = "BEP 10 extended handshake; extensions: " + (
+            ", ".join(self.extension_names) or "<none>"
+        )
+        if self.client is not None:
+            s += f"; client: {self.client}"
+        return s
 
     @classmethod
     def make(
