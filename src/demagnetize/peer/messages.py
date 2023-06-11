@@ -537,3 +537,19 @@ class BEP9Message(ExtendedMessage):
 
 
 AnyMessage = Message | ExtendedHandshake | ExtendedMessage
+
+
+def decode_message(blob: bytes, extensions: BEP10Registry) -> AnyMessage:
+    msg = Message.parse(blob)
+    if isinstance(msg, Extended):
+        return msg.decompose(extensions)
+    else:
+        return msg
+
+
+def encode_message(msg: AnyMessage, extensions: BEP10Registry) -> bytes:
+    if isinstance(msg, ExtendedHandshake):
+        msg = msg.to_extended()
+    elif isinstance(msg, ExtendedMessage):
+        msg = msg.to_extended(extensions)
+    return bytes(msg)

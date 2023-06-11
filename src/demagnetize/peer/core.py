@@ -20,15 +20,14 @@ from .messages import (
     BEP9Message,
     Bitfield,
     EmptyMessage,
-    Extended,
     ExtendedHandshake,
-    ExtendedMessage,
     Handshake,
     Have,
     HaveNone,
-    Message,
     Piece,
     Suggest,
+    decode_message,
+    encode_message,
 )
 from ..bencode import unbencode
 from ..consts import CLIENT, MAX_PEER_MSG_LEN, PEER_CONNECT_TIMEOUT, UT_METADATA
@@ -133,12 +132,8 @@ class PeerConnection(ObjectStream[AnyMessage]):
 
     async def send(self, msg: AnyMessage) -> None:
         log.log(TRACE, "Sending to %s: %s", self.peer, msg)
-        if isinstance(msg, ExtendedHandshake):
-            msg = msg.to_extended()
-        elif isinstance(msg, ExtendedMessage):
-            msg = msg.to_extended(self.remote_bep10_registry)
         try:
-            await self.socket.send(bytes(msg))
+            await self.socket.send(encode_message(msg, self.remote_bep10_registry))
         except (BrokenResourceError, ClosedResourceError):
             self.error("Peer closed the connection early")
 
@@ -200,11 +195,8 @@ class PeerConnection(ObjectStream[AnyMessage]):
                 log.log(TRACE, "%s sent keepalive", self.peer)
             else:
                 payload = await self.read(length)
-                msg: AnyMessage
                 try:
-                    msg = Message.parse(blen + payload)
-                    if isinstance(msg, Extended):
-                        msg = msg.decompose(LOCAL_BEP10_REGISTRY)
+                    msg = decode_message(blen + payload, LOCAL_BEP10_REGISTRY)
                 except ValueError as e:
                     log.log(TRACE, "Bad message from %s: %r", self.peer, payload)
                     self.error(f"Peer sent invalid message: {e}")
