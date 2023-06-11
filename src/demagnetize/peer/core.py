@@ -216,10 +216,10 @@ class PeerConnection(ObjectStream[AnyMessage]):
 
 
 async def get_metadata_info(conn: PeerConnection) -> dict:
-    # Unlike a normal torrent, we expect to get the entire info from a
-    # single peer and error if it can't give it to us (because peers should
-    # only be sending any info if they've checked the whole thing, and if
-    # they can't send it all, why should we trust them?)
+    # Unlike a normal torrent, we expect to get the entire info from a single
+    # peer and error if it can't give it to us (because peers should only be
+    # sending any info if they've checked the whole thing, and if they can't
+    # send it all, why should we trust them?)
     try:
         ### TODO: Put a timeout on this:
         async for msg in conn:
@@ -263,8 +263,8 @@ async def get_metadata_info(conn: PeerConnection) -> dict:
                 if msg.msg_type == BEP9MsgType.DATA:
                     if msg.piece != i:
                         conn.error(
-                            "received data for info piece"
-                            f" {msg.piece}, which we did not request"
+                            f"received data for info piece {msg.piece}, which"
+                            " we did not request"
                         )
                     elif (
                         msg.total_size is not None
@@ -272,8 +272,8 @@ async def get_metadata_info(conn: PeerConnection) -> dict:
                     ):
                         conn.error(
                             "'total_size' in info data message"
-                            f" ({msg.total_size}) differs from"
-                            f" previous value ({info_piecer.total_size})"
+                            f" ({msg.total_size}) differs from previous value"
+                            f" ({info_piecer.total_size})"
                         )
                     log.debug("%s sent info piece %d", conn.peer, msg.piece)
                     try:
@@ -296,8 +296,8 @@ async def get_metadata_info(conn: PeerConnection) -> dict:
                 else:
                     log.log(
                         TRACE,
-                        "%s sent ut_metadata message with unknown"
-                        " msg_type %d; ignoring",
+                        "%s sent ut_metadata message with unknown msg_type %d;"
+                        " ignoring",
                         conn.peer,
                         msg.msg_type,
                     )
