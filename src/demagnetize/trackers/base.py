@@ -54,8 +54,7 @@ class Tracker(ABC):
                         await conn.announce(info_hash, AnnounceEvent.STARTED)
                     ).peers
                     log.info("%s returned %d peers", self, len(peers))
-                    log.log(
-                        TRACE,
+                    log.debug(
                         "%s returned peers: %s",
                         self,
                         ", ".join(map(str, peers)),

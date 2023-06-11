@@ -179,11 +179,12 @@ class PeerConnection(ObjectStream[AnyMessage]):
         except ValueError as e:
             log.log(TRACE, "Bad handshake from %s: %r", self.peer, r)
             self.error(f"Peer sent bad handshake: {e}")
-        log.debug(
-            "%s sent handshake; extensions: %s; peer_id: %s",
+        log.log(
+            TRACE,
+            "%s sent handshake; extensions: %s; peer_id: %r",
             self.peer,
             ", ".join(hs.extension_names) or "<none>",
-            hs.peer_id.decode("utf-8", "replace"),
+            hs.peer_id,
         )
         if hs.info_hash != self.info_hash:
             self.error(f"Peer replied with wrong info hash (got {hs.info_hash})")
