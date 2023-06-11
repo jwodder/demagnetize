@@ -197,14 +197,14 @@ class InfoPiecer:
         return cast(str, self.digest.hexdigest())
 
 
-def get_typed_value(data: dict, key: Any, klass: type[T]) -> Optional[T]:
+def get_typed_value(data: dict[bytes, Any], key: bytes, klass: type[T]) -> Optional[T]:
     if isinstance(value := data.get(key), klass):
         return value
     else:
         return None
 
 
-def get_string(data: dict, key: Any) -> Optional[str]:
+def get_string(data: dict[bytes, Any], key: bytes) -> Optional[str]:
     if isinstance(value := data.get(key), bytes):
         return value.decode("utf-8", "replace")
     else:
