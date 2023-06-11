@@ -1,7 +1,7 @@
-.. image:: http://www.repostatus.org/badges/latest/wip.svg
-    :target: http://www.repostatus.org/#wip
-    :alt: Project Status: WIP — Initial development is in progress, but there
-          has not yet been a stable, usable release suitable for the public.
+.. image:: http://www.repostatus.org/badges/latest/active.svg
+    :target: http://www.repostatus.org/#active
+    :alt: Project Status: Active — The project has reached a stable, usable
+          state and is being actively developed.
 
 .. image:: https://github.com/jwodder/demagnetize/workflows/Test/badge.svg?branch=master
     :target: https://github.com/jwodder/demagnetize/actions?workflow=Test
@@ -10,11 +10,15 @@
 .. image:: https://codecov.io/gh/jwodder/demagnetize/branch/master/graph/badge.svg
     :target: https://codecov.io/gh/jwodder/demagnetize
 
+.. image:: https://img.shields.io/pypi/pyversions/demagnetize.svg
+    :target: https://pypi.org/project/demagnetize/
+
 .. image:: https://img.shields.io/github/license/jwodder/demagnetize.svg
     :target: https://opensource.org/licenses/MIT
     :alt: MIT License
 
 `GitHub <https://github.com/jwodder/demagnetize>`_
+| `PyPI <https://pypi.org/project/demagnetize/>`_
 | `Issues <https://github.com/jwodder/demagnetize/issues>`_
 
 ``demagnetize`` is a Python program for converting one or more BitTorrent
@@ -49,7 +53,7 @@ Installation
 ``demagnetize`` requires Python 3.10 or higher.  Just use `pip
 <https://pip.pypa.io>`_ for Python 3 (You have pip, right?) to install it::
 
-    python3 -m pip install git+https://github.com/jwodder/demagnetize.git
+    python3 -m pip install demagnetize
 
 
 Usage
