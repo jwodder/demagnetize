@@ -38,7 +38,8 @@ particular order:
 - Distributed hash tables
 - BitTorrent protocol v2
 - UDP tracker protocol extensions (`BEP 41`_)
-- uTP (possibly)
+- ``x.pe`` parameters in magnet links
+- uTP
 
 .. _BEP 41: https://www.bittorrent.org/beps/bep_0041.html
 
