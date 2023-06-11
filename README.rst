@@ -93,8 +93,8 @@ Options
 -o PATH, --outfile PATH
                         Save the ``.torrent`` file to the given path.  The path
                         may contain a ``{name}`` placeholder, which will be
-                        replaced by the name of the torrent, and/or a
-                        ``{hash}`` placeholder, which will be replaced by the
+                        replaced by the (sanitized) name of the torrent, and/or
+                        a ``{hash}`` placeholder, which will be replaced by the
                         torrent's info hash in hexadecimal.  Specifying ``-``
                         will cause the torrent to be written to standard
                         output.  [default: ``{name}.torrent``]
@@ -119,7 +119,7 @@ Options
 -o PATH, --outfile PATH
                         Save the ``.torrent`` files to the given path.  The
                         path may contain a ``{name}`` placeholder, which will
-                        be replaced by the name of the torrent, and/or a
-                        ``{hash}`` placeholder, which will be replaced by the
-                        torrent's info hash in hexadecimal.  [default:
+                        be replaced by the (sanitized) name of the torrent,
+                        and/or a ``{hash}`` placeholder, which will be replaced
+                        by the torrent's info hash in hexadecimal.  [default:
                         ``{name}.torrent``]
