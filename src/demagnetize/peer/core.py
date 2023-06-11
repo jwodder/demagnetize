@@ -47,7 +47,18 @@ LOCAL_BEP10_REGISTRY = BEP10Registry.from_dict(
     }
 )
 
-IGNORED_MESSAGES = (EmptyMessage, Have, Bitfield, Piece, AllowedFast, Suggest)
+IGNORED_MESSAGES = (
+    EmptyMessage,
+    Have,
+    Bitfield,
+    Piece,
+    AllowedFast,
+    Suggest,
+    # It's valid for a peer to send an extended handshake more than once, and
+    # it's valid for us to ignore subsequent handshakes, so that's what we'll
+    # do.
+    ExtendedHandshake,
+)
 
 PeerAddress = tuple[str, int]
 
