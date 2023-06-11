@@ -525,4 +525,4 @@ class BEP9Message(ExtendedMessage):
         return bencode(data) + self.payload
 
 
-MessageType = Message | ExtendedHandshake | ExtendedMessage
+AnyMessage = Message | ExtendedHandshake | ExtendedMessage

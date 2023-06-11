@@ -16,6 +16,7 @@ import attr
 from .extensions import BEP9MsgType, BEP10Extension, BEP10Registry, Extension
 from .messages import (
     AllowedFast,
+    AnyMessage,
     BEP9Message,
     Bitfield,
     EmptyMessage,
@@ -26,7 +27,6 @@ from .messages import (
     Have,
     HaveNone,
     Message,
-    MessageType,
     Piece,
     Suggest,
 )
@@ -113,7 +113,7 @@ class Peer:
 
 
 @attr.define
-class PeerConnection(ObjectStream[MessageType]):
+class PeerConnection(ObjectStream[AnyMessage]):
     peer: Peer
     app: Demagnetizer
     socket: SocketStream
@@ -128,7 +128,7 @@ class PeerConnection(ObjectStream[MessageType]):
     async def aclose(self) -> None:
         await self.socket.aclose()
 
-    async def send(self, msg: MessageType) -> None:
+    async def send(self, msg: AnyMessage) -> None:
         log.log(TRACE, "Sending to %s: %s", self.peer, msg)
         if isinstance(msg, ExtendedHandshake):
             msg = msg.to_extended()
@@ -189,7 +189,7 @@ class PeerConnection(ObjectStream[MessageType]):
     def error(self, msg: str) -> NoReturn:
         raise PeerError(peer=self.peer, info_hash=self.info_hash, msg=msg)
 
-    async def receive(self) -> MessageType:
+    async def receive(self) -> AnyMessage:
         while True:
             blen = await self.read(4)
             length = int.from_bytes(blen, "big")
@@ -202,7 +202,7 @@ class PeerConnection(ObjectStream[MessageType]):
                 log.log(TRACE, "%s sent keepalive", self.peer)
             else:
                 payload = await self.read(length)
-                msg: MessageType
+                msg: AnyMessage
                 try:
                     msg = Message.parse(blen + payload)
                     if isinstance(msg, Extended):
