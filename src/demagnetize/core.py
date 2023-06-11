@@ -1,29 +1,16 @@
 from __future__ import annotations
-from collections.abc import AsyncIterator
-from contextlib import aclosing, asynccontextmanager
 from pathlib import Path
 from random import randint
 from time import time
-from anyio import CapacityLimiter, create_memory_object_stream, create_task_group
+from anyio import CapacityLimiter
 import attr
 import click
 from torf import Magnet, Torrent
 from torf._utils import decode_dict
-from .bencode import bencode
 from .consts import CLIENT, MAGNET_LIMIT
 from .errors import DemagnetizeError
-from .peer import Peer
 from .session import TorrentSession
-from .trackers import Tracker
-from .util import (
-    InfoHash,
-    Key,
-    Report,
-    acollect,
-    log,
-    make_peer_id,
-    template_torrent_filename,
-)
+from .util import Key, Report, acollect, log, make_peer_id, template_torrent_filename
 
 
 @attr.define
@@ -75,31 +62,6 @@ class Demagnetizer:
         session = self.open_session(magnet)
         md = await session.get_info()
         return compose_torrent(magnet, md)
-
-    async def get_peers_from_tracker(
-        self, tracker: Tracker, info_hash: InfoHash
-    ) -> list[Peer]:
-        async with create_task_group() as tg:
-            sender, receiver = create_memory_object_stream()
-            tg.start_soon(tracker.get_peers, self, info_hash, sender)
-            peers: list[Peer] = []
-            async with receiver:
-                async for p in receiver:
-                    peers.append(p)
-            return peers
-
-    @asynccontextmanager
-    async def get_peers_for_magnet(
-        self, magnet: Magnet
-    ) -> AsyncIterator[AsyncIterator[Peer]]:
-        session = self.open_session(magnet)
-        async with create_task_group() as tg:
-            async with aclosing(session.get_all_peers(tg)) as ait:
-                yield ait
-
-    async def get_info_from_peer(self, peer: Peer, info_hash: InfoHash) -> bytes:
-        info = await peer.get_info(self, info_hash)
-        return bencode(info)
 
     def open_session(self, magnet: Magnet) -> TorrentSession:
         return TorrentSession(app=self, magnet=magnet)

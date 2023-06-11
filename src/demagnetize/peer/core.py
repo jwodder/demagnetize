@@ -1,7 +1,7 @@
 from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, NoReturn, Optional
+from typing import TYPE_CHECKING, NoReturn, Optional
 from anyio import (
     BrokenResourceError,
     ClosedResourceError,
@@ -79,14 +79,6 @@ class Peer:
     @property
     def address(self) -> PeerAddress:
         return (self.host, self.port)
-
-    def for_json(self) -> dict[str, Any]:
-        pid: Optional[str]
-        if self.id is not None:
-            pid = self.id.decode("utf-8", "replace")
-        else:
-            pid = None
-        return {"host": self.host, "port": self.port, "id": pid}
 
     async def get_info(self, app: Demagnetizer, info_hash: InfoHash) -> dict:
         log.info("Requesting info for %s from %s", info_hash, self)
