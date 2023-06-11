@@ -112,8 +112,8 @@ class HTTPAnnounceResponse(AnnounceResponse):
         # Unknown fields and (most) fields of the wrong type are discarded
         try:
             data = unbencode(content)
-        except UnbencodeError:
-            raise ValueError("invalid bencoded data")
+        except UnbencodeError as e:
+            raise ValueError(f"invalid bencoded data: {e}")
         if not isinstance(data, dict):
             raise ValueError("invalid response")
         if (failure := data.get(b"failure reason")) is not None:

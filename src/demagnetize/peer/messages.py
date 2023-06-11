@@ -418,8 +418,8 @@ class ExtendedHandshake:
     def from_extended_payload(cls, payload: bytes) -> ExtendedHandshake:
         try:
             data = unbencode(payload)
-        except UnbencodeError:
-            raise ValueError("invalid bencoded data")
+        except UnbencodeError as e:
+            raise ValueError(f"invalid bencoded data: {e}")
         if not isinstance(data, dict):
             raise ValueError("payload is not a dict")
         if not isinstance(data.get(b"m"), dict):
@@ -490,8 +490,10 @@ class BEP9Message(ExtendedMessage):
     def from_extended_payload(cls, payload: bytes) -> BEP9Message:
         try:
             data, trailing = partial_unbencode(payload)
-        except UnbencodeError:
-            raise ValueError("ut_metadata message does not start with valid bencode")
+        except UnbencodeError as e:
+            raise ValueError(
+                f"ut_metadata message does not start with valid bencode: {e}"
+            )
         if not isinstance(data, dict):
             raise ValueError("ut_metadata message does not start with a dict")
         if not isinstance(msg_type := data.get(b"msg_type"), int):

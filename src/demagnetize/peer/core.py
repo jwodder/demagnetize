@@ -323,7 +323,8 @@ async def get_metadata_info(conn: PeerConnection) -> dict:
     data = info_piecer.get_data()
     try:
         info = unbencode(data)
-        assert isinstance(info, dict)
-    except (UnbencodeError, AssertionError):
-        conn.error("Received invalid bencoded data as info")
+    except UnbencodeError as e:
+        conn.error(f"Received invalid bencoded data as info: {e}")
+    if not isinstance(info, dict):
+        conn.error("Received bencoded non-dict as info")
     return info
