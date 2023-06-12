@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import sys
 from typing import Optional, TextIO
 import anyio
 import click
@@ -42,6 +43,7 @@ def main(log_level: int) -> None:
             "CRITICAL": "bold_red",
         },
         level=log_level,
+        stream=sys.stderr,
     )
     logging.addLevelName(TRACE, "TRACE")
 

@@ -20,6 +20,7 @@
 `GitHub <https://github.com/jwodder/demagnetize>`_
 | `PyPI <https://pypi.org/project/demagnetize/>`_
 | `Issues <https://github.com/jwodder/demagnetize/issues>`_
+| `Changelog <https://github.com/jwodder/demagnetize/blob/master/CHANGELOG.md>`_
 
 ``demagnetize`` is a Python program for converting one or more BitTorrent
 `magnet links`_ into ``.torrent`` files by downloading the torrent info from
