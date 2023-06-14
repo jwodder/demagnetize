@@ -33,8 +33,7 @@ protocol.  The following notable features are supported:
 
 - BitTorrent protocol v1
 - HTTP and UDP trackers
-- magnet URIs with info hashes encoded in either hexadecimal (btih) or base32
-  (btmh)
+- magnet URIs with info hashes encoded in either hexadecimal or base32
 - Fast extension (`BEP 6`_)
 
 .. _BEP 6: https://www.bittorrent.org/beps/bep_0006.html
