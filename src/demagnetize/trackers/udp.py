@@ -98,6 +98,7 @@ class UDPTrackerSession(TrackerSession):
                     downloaded=downloaded,
                     uploaded=uploaded,
                     left=left,
+                    urldata=self.tracker.url.path_qs,
                 )
             except ConnectionTimeoutError:
                 log.log(
@@ -169,9 +170,11 @@ class Connection:
         self,
         info_hash: InfoHash,
         event: AnnounceEvent,
+        *,
         downloaded: int = 0,
         uploaded: int = 0,
         left: int = LEFT,
+        urldata: str,
     ) -> UDPAnnounceResponse:
         transaction_id = make_transaction_id()
         msg = build_announce_request(
@@ -185,6 +188,7 @@ class Connection:
             downloaded=downloaded,
             uploaded=uploaded,
             left=left,
+            urldata=urldata,
         )
         return await self.session.send_receive(
             msg,
@@ -251,10 +255,11 @@ def build_announce_request(
     downloaded: int,
     uploaded: int,
     left: int,
+    urldata: str,
     numwant: int = NUMWANT,
 ) -> bytes:
     ip_address = b"\0\0\0\0"
-    return (
+    bs = (
         struct.pack("!qii", connection_id, 1, transaction_id)
         + bytes(info_hash)
         + (peer_id + b"\0" * 20)[:20]
@@ -263,6 +268,13 @@ def build_announce_request(
         + bytes(key)
         + struct.pack("!iH", numwant, peer_port)
     )
+    # BEP 41
+    ud = urldata.encode("utf-8")
+    while ud:
+        segment = ud[:255]
+        ud = ud[255:]
+        bs += bytes([0x02, len(segment)]) + segment
+    return bs
 
 
 def parse_announce_response(

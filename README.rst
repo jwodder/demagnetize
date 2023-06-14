@@ -35,8 +35,10 @@ protocol.  The following notable features are supported:
 - HTTP and UDP trackers
 - magnet URIs with info hashes encoded in either hexadecimal or base32
 - Fast extension (`BEP 6`_)
+- UDP tracker protocol extensions (`BEP 41`_)
 
 .. _BEP 6: https://www.bittorrent.org/beps/bep_0006.html
+.. _BEP 41: https://www.bittorrent.org/beps/bep_0041.html
 
 The following features are not currently supported but are planned, in no
 particular order:
@@ -44,11 +46,8 @@ particular order:
 - Encryption
 - Distributed hash tables
 - BitTorrent protocol v2
-- UDP tracker protocol extensions (`BEP 41`_)
 - ``x.pe`` parameters in magnet links
 - uTP
-
-.. _BEP 41: https://www.bittorrent.org/beps/bep_0041.html
 
 
 Installation

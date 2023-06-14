@@ -39,12 +39,36 @@ def test_build_announce_request() -> None:
         uploaded=0,
         left=(1 << 63) - 1,
         numwant=80,
+        urldata="",
     ) == (
         b"\\\xcb\xdf\xdb\x15|%\xba\x00\x00\x00\x01\xa57\xee\xe7L>!_\x9eP"
         b"\xb0mp\x8at\xc9\xb0\xe6n\x08\xbc\xe5 \xaa-TR3000-12nig788rk3b\x00"
         b"\x00\x00\x00\x00\x00\x00\x00\x7f\xff\xff\xff\xff\xff\xff\xff\x00"
         b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00,T^"
         b"\xde\x00\x00\x00P\xea\xa5"
+    )
+
+
+def test_build_announce_request_with_urldata() -> None:
+    assert build_announce_request(
+        transaction_id=-1523061017,
+        connection_id=0x5CCBDFDB157C25BA,
+        info_hash=InfoHash.from_string("4c3e215f9e50b06d708a74c9b0e66e08bce520aa"),
+        peer_id=b"-TR3000-12nig788rk3b",
+        peer_port=60069,
+        key=Key(0x2C545EDE),
+        event=AnnounceEvent.STARTED,
+        downloaded=0,
+        uploaded=0,
+        left=(1 << 63) - 1,
+        numwant=80,
+        urldata="/announce",
+    ) == (
+        b"\\\xcb\xdf\xdb\x15|%\xba\x00\x00\x00\x01\xa57\xee\xe7L>!_\x9eP"
+        b"\xb0mp\x8at\xc9\xb0\xe6n\x08\xbc\xe5 \xaa-TR3000-12nig788rk3b\x00"
+        b"\x00\x00\x00\x00\x00\x00\x00\x7f\xff\xff\xff\xff\xff\xff\xff\x00"
+        b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00,T^"
+        b"\xde\x00\x00\x00P\xea\xa5\x02\x09/announce"
     )
 
 
@@ -103,14 +127,11 @@ def test_parse_announce_response() -> None:
 
 
 def test_parse_announce_response_no_peers() -> None:
-    assert (
-        parse_announce_response(
-            transaction_id=-904575366,
-            is_ipv6=False,
-            resp=(
-                b"\x00\x00\x00\x01\xca\x15Fz\x00\x00\x07\x08\x00\x00\x00\x02"
-                b"\x00\x00\x00\x1a"
-            ),
-        )
-        == UDPAnnounceResponse(interval=1800, leechers=2, seeders=26, peers=[])
-    )
+    assert parse_announce_response(
+        transaction_id=-904575366,
+        is_ipv6=False,
+        resp=(
+            b"\x00\x00\x00\x01\xca\x15Fz\x00\x00\x07\x08\x00\x00\x00\x02"
+            b"\x00\x00\x00\x1a"
+        ),
+    ) == UDPAnnounceResponse(interval=1800, leechers=2, seeders=26, peers=[])
