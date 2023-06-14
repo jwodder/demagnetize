@@ -35,6 +35,9 @@ protocol.  The following notable features are supported:
 - HTTP and UDP trackers
 - magnet URIs with info hashes encoded in either hexadecimal (btih) or base32
   (btmh)
+- Fast extension (`BEP 6`_)
+
+.. _BEP 6: https://www.bittorrent.org/beps/bep_0006.html
 
 The following features are not currently supported but are planned, in no
 particular order:
