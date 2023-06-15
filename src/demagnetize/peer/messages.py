@@ -371,7 +371,7 @@ class Extended(Message):
 
     @classmethod
     def from_payload(cls, payload: bytes) -> Extended:
-        if len(payload) < 8:
+        if len(payload) < 1:
             raise ValueError(
                 f"Invalid length for 'extended' payload; expected 1+ bytes,"
                 f" got {len(payload)}"
