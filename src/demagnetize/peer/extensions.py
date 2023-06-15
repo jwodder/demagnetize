@@ -55,10 +55,6 @@ class BEP10Registry:
                 msg_ids.register(bext, v)
         return msg_ids
 
-    @property
-    def extensions(self) -> set[BEP10Extension]:
-        return set(self.to_code.keys())
-
     def register(self, ext: BEP10Extension, code: int) -> None:
         if code in self.from_code:
             raise ValueError(f"conflicting declarations for code {code}")
