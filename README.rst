@@ -32,7 +32,7 @@ At the moment, ``demagnetize`` only supports basic features of the BitTorrent
 protocol.  The following notable features are supported:
 
 - BitTorrent protocol v1
-- HTTP and UDP trackers
+- HTTP (including compact and IPv6 extensions) and UDP trackers
 - magnet URIs with info hashes encoded in either hexadecimal or base32
 - Fast extension (`BEP 6`_)
 - UDP tracker protocol extensions (`BEP 41`_)
