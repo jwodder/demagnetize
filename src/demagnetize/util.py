@@ -123,7 +123,7 @@ def template_torrent_filename(fntemplate: str, torrent: Torrent) -> str:
 
 
 def sanitize_pathname(s: str) -> str:
-    return re.sub(r'[\0\x5C/<>:|"?*]', "_", re.sub(r"\s", " ", s))
+    return re.sub(r'[\0-\x1F\x5C/<>:|"?*]', "_", re.sub(r"\s", " ", s))
 
 
 def make_peer_id() -> bytes:
