@@ -125,7 +125,7 @@ Options
 -o PATH, --outfile PATH
                         Save the ``.torrent`` files to the given path.  The
                         path may contain a ``{name}`` placeholder, which will
-                        be replaced by the (sanitized) name of the torrent,
+                        be replaced by the (sanitized) name of each torrent,
                         and/or a ``{hash}`` placeholder, which will be replaced
-                        by the torrent's info hash in hexadecimal.  [default:
+                        by each torrent's info hash in hexadecimal.  [default:
                         ``{name}.torrent``]
