@@ -53,10 +53,11 @@ class Tracker(ABC):
                     peers = (
                         await conn.announce(info_hash, AnnounceEvent.STARTED)
                     ).peers
-                    log.info("%s returned %d peers", self, len(peers))
+                    log.info("%s returned %d peers for %s", self, len(peers), info_hash)
                     log.debug(
-                        "%s returned peers: %s",
+                        "%s returned peers for %s: %s",
                         self,
+                        info_hash,
                         ", ".join(map(str, peers)) or "<none>",
                     )
                     for p in peers:
