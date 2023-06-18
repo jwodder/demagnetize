@@ -31,6 +31,7 @@ def validate_template(
     help="Set logging level  [default: INFO]",
 )
 def main(log_level: int) -> None:
+    log.setLevel(log_level)
     colorlog.basicConfig(
         format="%(log_color)s%(asctime)s [%(levelname)-8s] %(name)s: %(message)s",
         datefmt="%H:%M:%S",
@@ -42,7 +43,7 @@ def main(log_level: int) -> None:
             "ERROR": "red",
             "CRITICAL": "bold_red",
         },
-        level=log_level,
+        level="INFO",
         stream=sys.stderr,
     )
     logging.addLevelName(TRACE, "TRACE")
