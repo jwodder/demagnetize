@@ -49,6 +49,9 @@ particular order:
 - ``x.pe`` parameters in magnet links
 - uTP
 
+``demagnetize`` has also been translated by the author into Rust; you can find
+the Rust version at <https://github.com/jwodder/demagnetize-rs>.
+
 
 Installation
 ============
