@@ -33,8 +33,8 @@ TRACKER_STOP_TIMEOUT = 3
 #: Maximum number of peers to interact with at once for a single magnet
 PEERS_PER_MAGNET_LIMIT = 30
 
-#: Timeout for connecting to a peer
-PEER_CONNECT_TIMEOUT = 5
+#: Timeout for connecting to a peer and performing the BitTorrent handshake
+PEER_HANDSHAKE_TIMEOUT = 60
 
 #: Maximum number of magnet links to operate on at once in batch mode
 MAGNET_LIMIT = 50

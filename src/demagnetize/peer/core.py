@@ -1,6 +1,4 @@
 from __future__ import annotations
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, NoReturn, Optional
 from anyio import (
     BrokenResourceError,
@@ -30,7 +28,7 @@ from .messages import (
     encode_message,
 )
 from ..bencode import unbencode
-from ..consts import CLIENT, MAX_PEER_MSG_LEN, PEER_CONNECT_TIMEOUT, UT_METADATA
+from ..consts import CLIENT, MAX_PEER_MSG_LEN, PEER_HANDSHAKE_TIMEOUT, UT_METADATA
 from ..errors import PeerError, UnbencodeError
 from ..util import TRACE, InfoHash, InfoPiecer, log
 
@@ -82,7 +80,16 @@ class Peer:
     async def get_info(self, app: Demagnetizer, info_hash: InfoHash) -> dict:
         log.info("Requesting info for %s from %s", info_hash, self)
         try:
-            async with self.connect(app, info_hash) as conn:
+            try:
+                with fail_after(PEER_HANDSHAKE_TIMEOUT):
+                    conn = await self.connect(app, info_hash)
+            except TimeoutError:
+                raise PeerError(
+                    peer=self,
+                    info_hash=info_hash,
+                    msg="Could not connect to peer in time",
+                )
+            async with conn:
                 return await get_metadata_info(conn)
         except OSError as e:
             raise PeerError(
@@ -91,27 +98,17 @@ class Peer:
                 msg=f"Communication error: {type(e).__name__}: {e}",
             )
 
-    @asynccontextmanager
-    async def connect(
-        self, app: Demagnetizer, info_hash: InfoHash
-    ) -> AsyncIterator[PeerConnection]:
+    async def connect(self, app: Demagnetizer, info_hash: InfoHash) -> PeerConnection:
         log.debug("Connecting to %s", self)
+        s = await connect_tcp(self.host, self.port)
+        log.log(TRACE, "Connected to %s", self)
+        conn = PeerConnection(peer=self, app=app, socket=s, info_hash=info_hash)
         try:
-            with fail_after(PEER_CONNECT_TIMEOUT):
-                s = await connect_tcp(self.host, self.port)
-        except TimeoutError:
-            raise PeerError(
-                peer=self,
-                info_hash=info_hash,
-                msg="Could not connect to peer in time",
-            )
-        async with s:
-            log.log(TRACE, "Connected to %s", self)
-            async with PeerConnection(
-                peer=self, app=app, socket=s, info_hash=info_hash
-            ) as conn:
-                await conn.handshake()
-                yield conn
+            await conn.handshake()
+        except BaseException:
+            await conn.aclose()
+            raise
+        return conn
 
 
 @attr.define
