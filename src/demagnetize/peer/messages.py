@@ -1,3 +1,6 @@
+# NOTE: Avoid using slotted classes here, as combining them with attrs and
+# `__subclasses__` can lead to Heisenbugs depending on when garbage collection
+# happens.
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections import deque
@@ -12,7 +15,7 @@ from ..errors import UnbencodeError
 from ..util import InfoHash, get_string, get_typed_value
 
 
-@attr.define
+@attr.define(slots=False)
 class Handshake:
     HEADER: ClassVar[bytes] = b"\x13BitTorrent protocol"
     LENGTH: ClassVar[int] = 20 + 8 + 20 + 20
@@ -61,6 +64,7 @@ class Handshake:
         return extnames
 
 
+@attr.define(slots=False)
 class Message(ABC):
     TYPE: ClassVar[int]
 
@@ -94,7 +98,7 @@ class Message(ABC):
         ...
 
 
-@attr.define  # To make the empty messages into useful classes
+@attr.define(slots=False)  # To make the empty messages into useful classes
 class EmptyMessage(Message):
     @classmethod
     def from_payload(cls, _payload: bytes) -> EmptyMessage:
@@ -147,7 +151,7 @@ class HaveNone(EmptyMessage):
         return "have none"
 
 
-@attr.define
+@attr.define(slots=False)
 class Have(Message):
     TYPE: ClassVar[int] = 4
     index: int
@@ -168,7 +172,7 @@ class Have(Message):
         return self.index.to_bytes(4, "big")
 
 
-@attr.define
+@attr.define(slots=False)
 class Bitfield(Message):
     TYPE: ClassVar[int] = 5
     payload: bytes
@@ -193,7 +197,7 @@ class Bitfield(Message):
         return qty
 
 
-@attr.define
+@attr.define(slots=False)
 class Request(Message):
     TYPE: ClassVar[int] = 6
     index: int
@@ -217,7 +221,7 @@ class Request(Message):
         return struct.pack("!III", self.index, self.begin, self.length)
 
 
-@attr.define
+@attr.define(slots=False)
 class Piece(Message):
     TYPE: ClassVar[int] = 7
     index: int
@@ -241,7 +245,7 @@ class Piece(Message):
         return struct.pack("!II", self.index, self.begin) + self.data
 
 
-@attr.define
+@attr.define(slots=False)
 class Cancel(Message):
     TYPE: ClassVar[int] = 8
     index: int
@@ -268,7 +272,7 @@ class Cancel(Message):
         return struct.pack("!III", self.index, self.begin, self.length)
 
 
-@attr.define
+@attr.define(slots=False)
 class Port(Message):
     TYPE: ClassVar[int] = 9
     port: int
@@ -289,7 +293,7 @@ class Port(Message):
         return self.port.to_bytes(2, "big")
 
 
-@attr.define
+@attr.define(slots=False)
 class Reject(Message):
     TYPE: ClassVar[int] = 0x10
     index: int
@@ -316,7 +320,7 @@ class Reject(Message):
         return struct.pack("!III", self.index, self.begin, self.length)
 
 
-@attr.define
+@attr.define(slots=False)
 class AllowedFast(Message):
     TYPE: ClassVar[int] = 0x11
     index: int
@@ -338,7 +342,7 @@ class AllowedFast(Message):
         return self.index.to_bytes(4, "big")
 
 
-@attr.define
+@attr.define(slots=False)
 class Suggest(Message):
     TYPE: ClassVar[int] = 0x0D
     index: int
@@ -360,7 +364,7 @@ class Suggest(Message):
         return self.index.to_bytes(4, "big")
 
 
-@attr.define
+@attr.define(slots=False)
 class Extended(Message):
     TYPE: ClassVar[int] = 20
     msg_id: int
@@ -397,7 +401,7 @@ class Extended(Message):
             raise ValueError(f"Unimplemented extended message ID {self.msg_id}")
 
 
-@attr.define
+@attr.define(slots=False)
 class ExtendedHandshake:
     data: dict
 
@@ -462,6 +466,7 @@ class ExtendedHandshake:
         return get_typed_value(self.data, b"metadata_size", int)
 
 
+@attr.define(slots=False)
 class ExtendedMessage(ABC):
     EXTENSION: ClassVar[BEP10Extension]
 
@@ -479,7 +484,7 @@ class ExtendedMessage(ABC):
         return Extended(msg_id=msg_id, payload=self.to_extended_payload())
 
 
-@attr.define
+@attr.define(slots=False)
 class BEP9Message(ExtendedMessage):
     EXTENSION: ClassVar[BEP10Extension] = BEP10Extension.METADATA
 
