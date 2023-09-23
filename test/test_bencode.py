@@ -1,3 +1,4 @@
+import platform
 from typing import Any
 import pytest
 from demagnetize.bencode import bencode, partial_unbencode, unbencode
@@ -53,7 +54,13 @@ def test_bencode(blob: bytes, data: Any) -> None:
         b"i12 e",
         b"i12:",
         b"5eapple",
-        b"l" * 1234 + b"e" * 1234,
+        pytest.param(
+            b"l" * 1234 + b"e" * 1234,
+            marks=pytest.mark.skipif(
+                platform.python_implementation() == "PyPy",
+                reason="Recursion depth is weird on PyPy",
+            ),
+        ),
     ],
 )
 def test_unbencode_error(blob: bytes) -> None:

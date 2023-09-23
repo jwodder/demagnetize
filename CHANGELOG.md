@@ -7,6 +7,8 @@ v0.2.0 (in development)
 - Sanitize all ASCII non-printable characters in torrent names when filling in
   output path templates
 - Suppress sub-INFO log messages from dependencies
+- Fix a Heisenbug involving attrs, slotted classes, and garbage collection
+- Test against PyPy
 
 v0.1.0 (2023-06-11)
 -------------------
