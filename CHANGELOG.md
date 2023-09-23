@@ -1,5 +1,5 @@
-v0.2.0 (in development)
------------------------
+v0.2.0 (2023-09-23)
+-------------------
 - Disable coloring of log messages when stderr is redirected
 - Increase colorlog minimum version requirement to 6.0
 - Support UDP tracker protocol extensions (BEP 41)
