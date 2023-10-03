@@ -5,7 +5,7 @@ from . import __version__
 CLIENT = f"demagnetize {__version__}"
 
 #: Prefix for generated peer IDs
-PEER_ID_PREFIX = "-DM-0020-"
+PEER_ID_PREFIX = "-DM-0030-"
 
 #: "left" value to use when announcing to a tracker for a torrent we have only
 #: the magnet link of

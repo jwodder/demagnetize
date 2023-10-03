@@ -1,3 +1,7 @@
+v0.3.0 (in development)
+-----------------------
+- Support Python 3.12
+
 v0.2.0 (2023-09-23)
 -------------------
 - Disable coloring of log messages when stderr is redirected
