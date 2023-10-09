@@ -27,8 +27,9 @@ def validate_template(
     "-l",
     "--log-level",
     type=LogLevel(extra={"TRACE": TRACE}),
-    default=logging.INFO,
-    help="Set logging level  [default: INFO]",
+    default="INFO",
+    help="Set logging level",
+    show_default=True,
 )
 def main(log_level: int) -> None:
     log.setLevel(log_level)
