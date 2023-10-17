@@ -22,7 +22,7 @@ def validate_template(
     return value
 
 
-@click.group()
+@click.group(context_settings={"help_option_names": ["-h", "--help"]})
 @click.option(
     "-l",
     "--log-level",
