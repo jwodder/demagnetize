@@ -138,7 +138,7 @@ async def acollect(
     coros: Iterable[Awaitable[T]], limit: Optional[CapacityLimiter] = None
 ) -> AsyncIterator[AsyncIterator[T]]:
     async with create_task_group() as tg:
-        sender, receiver = create_memory_object_stream()
+        sender, receiver = create_memory_object_stream[T]()
         async with sender:
             for c in coros:
                 tg.start_soon(_acollect_pipe, c, limit, sender.clone())

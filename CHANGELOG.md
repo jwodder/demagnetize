@@ -1,6 +1,7 @@
 v0.3.0 (in development)
 -----------------------
 - Support Python 3.12
+- Update anyio to 4.x
 
 v0.2.0 (2023-09-23)
 -------------------

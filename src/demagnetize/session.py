@@ -50,7 +50,7 @@ class TorrentSession:
         log.info("Fetching info for info hash %s%s", self.info_hash, display)
         async with create_task_group() as tg:
             peer_aiter = self.get_all_peers(tg)
-            info_sender, info_receiver = create_memory_object_stream(0, dict)
+            info_sender, info_receiver = create_memory_object_stream[dict](0)
             tg.start_soon(self._peer_pipe, peer_aiter, info_sender, tg)
             async with info_receiver:
                 try:
@@ -61,7 +61,7 @@ class TorrentSession:
             return md
 
     async def get_all_peers(self, task_group: TaskGroup) -> AsyncGenerator[Peer, None]:
-        sender, receiver = create_memory_object_stream()
+        sender, receiver = create_memory_object_stream[Peer]()
         async with sender:
             for url in self.magnet.tr:
                 try:
