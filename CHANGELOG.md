@@ -4,6 +4,7 @@ v0.3.0 (in development)
 - Update anyio to 4.x
 - Migrated from setuptools to hatch
 - Fix another occurrence of the Heisenbug from v0.2.0
+- Update torf requirement to `>= 4.2.2, < 5.0`
 
 v0.2.0 (2023-09-23)
 -------------------

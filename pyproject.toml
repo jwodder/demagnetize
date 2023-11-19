@@ -42,7 +42,7 @@ dependencies = [
     "click-loglevel ~= 0.5",
     "colorlog ~= 6.0",
     "httpx ~= 0.22",
-    "torf ~= 3.1",
+    "torf >= 4.2.2, < 5.0",
     "yarl ~= 1.7",
 ]
 
