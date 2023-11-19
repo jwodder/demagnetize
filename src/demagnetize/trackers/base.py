@@ -18,7 +18,10 @@ if TYPE_CHECKING:
     from ..core import Demagnetizer
 
 
-@attr.define
+# NOTE: Avoid using slotted classes here, as combining them with attrs and
+# `__subclasses__` can lead to Heisenbugs depending on when garbage collection
+# happens.
+@attr.define(slots=False)
 class Tracker(ABC):
     SCHEMES: ClassVar[list[str]]
     url: URL
@@ -126,7 +129,7 @@ class AnnounceResponse:
 def unpack_peers(data: bytes) -> list[Peer]:
     peers: list[Peer] = []
     try:
-        for (ipnum, port) in struct.iter_unpack("!IH", data):
+        for ipnum, port in struct.iter_unpack("!IH", data):
             ip = str(IPv4Address(ipnum))
             peers.append(Peer(host=ip, port=port))
     except (struct.error, AddressValueError):
@@ -137,7 +140,7 @@ def unpack_peers(data: bytes) -> list[Peer]:
 def unpack_peers6(data: bytes) -> list[Peer]:
     peers6: list[Peer] = []
     try:
-        for (*ipbytes, port) in struct.iter_unpack("!16cH", data):
+        for *ipbytes, port in struct.iter_unpack("!16cH", data):
             ip = str(IPv6Address(b"".join(ipbytes)))
             peers6.append(Peer(host=ip, port=port))
     except (struct.error, AddressValueError):
