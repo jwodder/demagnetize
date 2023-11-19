@@ -49,6 +49,7 @@ class UDPTracker(Tracker):
         self.port = self.url.port
 
     async def connect(self, app: Demagnetizer) -> UDPTrackerSession:
+        log.debug("Creating UDP socket to host %r, port %r", self.host, self.port)
         s = await create_connected_udp_socket(self.host, self.port)
         return UDPTrackerSession(tracker=self, app=app, socket=s)
 
