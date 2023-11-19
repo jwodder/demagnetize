@@ -31,7 +31,7 @@ T = TypeVar("T")
 PROTOCOL_ID = 0x41727101980
 
 
-@attr.define
+@attr.define(slots=False)
 class UDPTracker(Tracker):
     SCHEMES: ClassVar[list[str]] = ["udp"]
 
