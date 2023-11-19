@@ -1,5 +1,5 @@
-v0.3.0 (in development)
------------------------
+v0.3.0 (2023-11-19)
+-------------------
 - Support Python 3.12
 - Update anyio to 4.x
 - Migrated from setuptools to hatch
