@@ -137,26 +137,21 @@ def make_peer_id() -> bytes:
 async def acollect(
     coros: Iterable[Awaitable[T]], limit: Optional[CapacityLimiter] = None
 ) -> AsyncIterator[AsyncIterator[T]]:
+    async def pipe(coro: Awaitable[T], sndr: MemoryObjectSendStream[T]) -> None:
+        async with AsyncExitStack() as stack:
+            if limit is not None:
+                await stack.enter_async_context(limit)
+            await stack.enter_async_context(sndr)
+            value = await coro
+            await sndr.send(value)
+
     async with create_task_group() as tg:
         sender, receiver = create_memory_object_stream[T]()
         async with sender:
             for c in coros:
-                tg.start_soon(_acollect_pipe, c, limit, sender.clone())
+                tg.start_soon(pipe, c, sender.clone())
         async with receiver:
             yield receiver
-
-
-async def _acollect_pipe(
-    coro: Awaitable[T],
-    limit: Optional[CapacityLimiter],
-    sender: MemoryObjectSendStream[T],
-) -> None:
-    async with AsyncExitStack() as stack:
-        if limit is not None:
-            await stack.enter_async_context(limit)
-        await stack.enter_async_context(sender)
-        value = await coro
-        await sender.send(value)
 
 
 @attr.define
