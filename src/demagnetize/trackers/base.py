@@ -92,8 +92,7 @@ class Tracker(ABC):
             )
 
     @abstractmethod
-    async def connect(self, app: Demagnetizer) -> TrackerSession:
-        ...
+    async def connect(self, app: Demagnetizer) -> TrackerSession: ...
 
 
 class TrackerSession(AsyncResource):
@@ -105,8 +104,7 @@ class TrackerSession(AsyncResource):
         downloaded: int = 0,
         uploaded: int = 0,
         left: int = LEFT,
-    ) -> AnnounceResponse:
-        ...
+    ) -> AnnounceResponse: ...
 
 
 class AnnounceEvent(Enum):

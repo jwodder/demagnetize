@@ -90,12 +90,10 @@ class Message(ABC):
 
     @classmethod
     @abstractmethod
-    def from_payload(cls, payload: bytes) -> Message:
-        ...
+    def from_payload(cls, payload: bytes) -> Message: ...
 
     @abstractmethod
-    def to_payload(self) -> bytes:
-        ...
+    def to_payload(self) -> bytes: ...
 
 
 @attr.define(slots=False)  # To make the empty messages into useful classes
@@ -472,12 +470,10 @@ class ExtendedMessage(ABC):
 
     @classmethod
     @abstractmethod
-    def from_extended_payload(cls, payload: bytes) -> ExtendedMessage:
-        ...
+    def from_extended_payload(cls, payload: bytes) -> ExtendedMessage: ...
 
     @abstractmethod
-    def to_extended_payload(self) -> bytes:
-        ...
+    def to_extended_payload(self) -> bytes: ...
 
     def to_extended(self, extensions: BEP10Registry) -> Extended:
         msg_id = extensions.to_code[self.EXTENSION]
