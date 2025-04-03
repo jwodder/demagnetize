@@ -1,12 +1,12 @@
 from __future__ import annotations
+from datetime import datetime, timezone
 from pathlib import Path
 from random import randint
-from time import time
 from anyio import CapacityLimiter
 import attr
 import click
 from torf import Magnet, Torrent
-from torf._utils import decode_dict
+from torf._utils import decode_dict  # type: ignore[attr-defined]
 from .consts import CLIENT, MAGNET_LIMIT
 from .errors import DemagnetizeError
 from .session import TorrentSession
@@ -70,7 +70,7 @@ class Demagnetizer:
 def compose_torrent(magnet: Magnet, info: dict) -> Torrent:
     torrent = Torrent()
     torrent.metainfo["info"] = decode_dict(info)
-    torrent.trackers = magnet.tr
+    torrent.trackers = magnet.tr  # type: ignore[assignment]
     torrent.created_by = CLIENT
-    torrent.creation_date = time()
+    torrent.creation_date = datetime.now(tz=timezone.utc)
     return torrent
