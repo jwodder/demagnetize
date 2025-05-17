@@ -42,15 +42,6 @@ protocol.  The following notable features are supported:
 .. _BEP 6: https://www.bittorrent.org/beps/bep_0006.html
 .. _BEP 41: https://www.bittorrent.org/beps/bep_0041.html
 
-The following features are not currently supported but are planned, in no
-particular order:
-
-- Encryption
-- Distributed hash tables
-- BitTorrent protocol v2
-- ``x.pe`` parameters in magnet links
-- uTP
-
 ``demagnetize`` has also been translated by the author into Rust; you can find
 the Rust version at <https://github.com/jwodder/demagnetize-rs>.
 
