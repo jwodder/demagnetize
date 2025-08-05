@@ -37,7 +37,7 @@ class TorrentSession:
         self.info_hash = InfoHash.from_string(self.magnet.infohash)
         self.peer_limit = CapacityLimiter(PEERS_PER_MAGNET_LIMIT)
 
-    async def get_info(self) -> dict:
+    async def get_info(self) -> dict:  # type: ignore[return]
         if not self.magnet.tr:
             raise DemagnetizeError(
                 f"Cannot fetch info for info hash {self.info_hash}: No trackers"
