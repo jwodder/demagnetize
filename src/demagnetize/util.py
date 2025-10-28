@@ -7,7 +7,7 @@ import logging
 from random import choices, randrange
 import re
 from string import ascii_letters, digits
-from typing import Any, Optional, TypeVar, cast
+from typing import Any, TypeVar, cast
 from anyio import CapacityLimiter, create_memory_object_stream, create_task_group
 from anyio.streams.memory import MemoryObjectSendStream
 import attr
@@ -75,7 +75,7 @@ class Key:
 class Report:
     #: Collection of magnet links and the files their torrents were saved to
     #: (None if the demagnetization failed)
-    downloads: list[tuple[Magnet, Optional[str]]] = attr.Factory(list)
+    downloads: list[tuple[Magnet, str | None]] = attr.Factory(list)
 
     @classmethod
     def for_success(cls, magnet: Magnet, filename: str) -> Report:
@@ -135,7 +135,7 @@ def make_peer_id() -> bytes:
 
 @asynccontextmanager
 async def acollect(
-    coros: Iterable[Awaitable[T]], limit: Optional[CapacityLimiter] = None
+    coros: Iterable[Awaitable[T]], limit: CapacityLimiter | None = None
 ) -> AsyncIterator[AsyncIterator[T]]:
     async def pipe(coro: Awaitable[T], sndr: MemoryObjectSendStream[T]) -> None:
         async with AsyncExitStack() as stack:
@@ -192,14 +192,14 @@ class InfoPiecer:
         return cast(str, self.digest.hexdigest())
 
 
-def get_typed_value(data: dict[bytes, Any], key: bytes, klass: type[T]) -> Optional[T]:
+def get_typed_value(data: dict[bytes, Any], key: bytes, klass: type[T]) -> T | None:
     if isinstance(value := data.get(key), klass):
         return value
     else:
         return None
 
 
-def get_string(data: dict[bytes, Any], key: bytes) -> Optional[str]:
+def get_string(data: dict[bytes, Any], key: bytes) -> str | None:
     if isinstance(value := data.get(key), bytes):
         return value.decode("utf-8", "replace")
     else:

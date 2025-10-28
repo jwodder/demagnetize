@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, ClassVar, Optional, TypeVar, cast
+from typing import TYPE_CHECKING, ClassVar, TypeVar, cast
 from urllib.parse import quote
 import attr
 from httpx import AsyncClient, HTTPError
@@ -101,11 +101,11 @@ class HTTPTrackerSession(TrackerSession):
 
 @attr.define
 class HTTPAnnounceResponse(AnnounceResponse):
-    warning_message: Optional[str] = None
-    min_interval: Optional[int] = None
-    tracker_id: Optional[bytes] = None
-    complete: Optional[int] = None
-    incomplete: Optional[int] = None
+    warning_message: str | None = None
+    min_interval: int | None = None
+    tracker_id: bytes | None = None
+    complete: int | None = None
+    incomplete: int | None = None
 
     @classmethod
     def parse(cls, content: bytes) -> HTTPAnnounceResponse:
@@ -141,7 +141,7 @@ class HTTPAnnounceResponse(AnnounceResponse):
                         port = p[b"port"]
                     else:
                         raise ValueError("invalid 'peers' list")
-                    peer_id: Optional[bytes]
+                    peer_id: bytes | None
                     if b"peer id" in p and isinstance(p[b"peer id"], bytes):
                         peer_id = p[b"peer id"]
                     else:

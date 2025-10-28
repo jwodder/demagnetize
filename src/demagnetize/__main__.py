@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 import sys
-from typing import Optional, TextIO
+from typing import TextIO
 import anyio
 import click
 from click_loglevel import LogLevel
@@ -12,8 +12,8 @@ from .util import TRACE, log, yield_lines
 
 
 def validate_template(
-    _ctx: click.Context, _param: click.Parameter, value: Optional[str]
-) -> Optional[str]:
+    _ctx: click.Context, _param: click.Parameter, value: str | None
+) -> str | None:
     if value is not None:
         try:
             value.format(name="name", hash="hash")
