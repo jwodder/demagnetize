@@ -7,7 +7,7 @@ from collections import deque
 from functools import reduce
 from operator import or_
 import struct
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar
 import attr
 from .extensions import BEP9MsgType, BEP10Extension, BEP10Registry, Extension
 from ..bencode import bencode, partial_unbencode, unbencode
@@ -415,8 +415,8 @@ class ExtendedHandshake:
     def make(
         cls,
         extensions: BEP10Registry,
-        client: Optional[str] = None,
-        metadata_size: Optional[int] = None,
+        client: str | None = None,
+        metadata_size: int | None = None,
     ) -> ExtendedHandshake:
         data: dict[bytes, Any] = {b"m": extensions.to_m()}
         if client is not None:
@@ -456,11 +456,11 @@ class ExtendedHandshake:
         return BEP10Registry.from_m(self.data[b"m"])
 
     @property
-    def client(self) -> Optional[str]:
+    def client(self) -> str | None:
         return get_string(self.data, b"v")
 
     @property
-    def metadata_size(self) -> Optional[int]:
+    def metadata_size(self) -> int | None:
         return get_typed_value(self.data, b"metadata_size", int)
 
 
@@ -486,7 +486,7 @@ class BEP9Message(ExtendedMessage):
 
     msg_type: int
     piece: int
-    total_size: Optional[int] = None
+    total_size: int | None = None
     payload: bytes = b""
 
     def __str__(self) -> str:

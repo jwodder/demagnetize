@@ -60,7 +60,7 @@ class TorrentSession:
             tg.cancel_scope.cancel()
             return md
 
-    async def get_all_peers(self, task_group: TaskGroup) -> AsyncGenerator[Peer, None]:
+    async def get_all_peers(self, task_group: TaskGroup) -> AsyncGenerator[Peer]:
         sender, receiver = create_memory_object_stream[Peer]()
         async with sender:
             for url in self.magnet.tr:
@@ -82,7 +82,7 @@ class TorrentSession:
 
     async def _peer_pipe(
         self,
-        peer_aiter: AsyncGenerator[Peer, None],
+        peer_aiter: AsyncGenerator[Peer],
         info_sender: MemoryObjectSendStream[dict],
         task_group: TaskGroup,
     ) -> None:

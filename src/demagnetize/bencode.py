@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Optional
+from typing import Any
 import attr
 from .errors import UnbencodeError
 
@@ -64,7 +64,7 @@ class Unbencoder:
         c = self.getchar()
         if c == b"d":
             bdict: dict[bytes, Any] = {}
-            prev_key: Optional[bytes] = None
+            prev_key: bytes | None = None
             while self.peek() != b"e":
                 key = self.decode_next()
                 if not isinstance(key, bytes):

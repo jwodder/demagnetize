@@ -7,7 +7,7 @@ from random import randint
 from socket import AF_INET6
 import struct
 from time import time
-from typing import TYPE_CHECKING, Any, ClassVar, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 from anyio import create_connected_udp_socket, fail_after
 from anyio.abc import ConnectedUDPSocket, SocketAttribute
 import attr
@@ -59,7 +59,7 @@ class UDPTrackerSession(TrackerSession):
     tracker: UDPTracker
     app: Demagnetizer
     socket: ConnectedUDPSocket
-    connection: Optional[Connection] = None
+    connection: Connection | None = None
 
     @property
     def is_ipv6(self) -> bool:
@@ -113,7 +113,7 @@ class UDPTrackerSession(TrackerSession):
         self,
         msg: bytes,
         response_parser: Callable[[bytes], T],
-        expiration: Optional[float] = None,
+        expiration: float | None = None,
     ) -> T:
         ctx: AbstractContextManager[Any]
         if expiration is None:

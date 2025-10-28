@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, NoReturn, Optional
+from typing import TYPE_CHECKING, NoReturn
 from anyio import (
     BrokenResourceError,
     ClosedResourceError,
@@ -64,7 +64,7 @@ PeerAddress = tuple[str, int]
 class Peer:
     host: str
     port: int
-    id: Optional[bytes] = None  # noqa: A003
+    id: bytes | None = None  # noqa: A003
 
     def __str__(self) -> str:
         if ":" in self.host:

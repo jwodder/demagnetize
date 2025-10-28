@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import Optional
 import pytest
 from demagnetize.peer.extensions import (
     BEP9MsgType,
@@ -203,8 +202,8 @@ def test_extended_handshake(
     handshake: ExtendedHandshake,
     extensions: BEP10Registry,
     extension_names: list[str],
-    client: Optional[str],
-    metadata_size: Optional[int],
+    client: str | None,
+    metadata_size: int | None,
 ) -> None:
     assert ExtendedHandshake.from_extended_payload(payload) == handshake
     assert handshake.to_extended() == Extended(0, payload)
