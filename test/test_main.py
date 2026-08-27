@@ -62,19 +62,24 @@ def show_result(r: Result) -> str:
         ),
     ],
 )
-def test_get(magnet: str, infohash: str, trackers: list[str]) -> None:
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        r = runner.invoke(
-            main,
-            ["-l", "DEBUG", "get", "-o", "{hash}.torrent", magnet],
-            standalone_mode=False,
-        )
-        assert r.exit_code == 0, show_result(r)
-        p = Path(f"{infohash}.torrent")
-        assert p.exists()
-        t = Torrent.read(p)
-        assert t.infohash == infohash
-        assert t.created_by is not None
-        assert t.created_by.startswith("demagnetize ")
-        assert [tr for tier in t.trackers for tr in tier] == trackers
+def test_get(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    magnet: str,
+    infohash: str,
+    trackers: list[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    r = CliRunner().invoke(
+        main,
+        ["-l", "DEBUG", "get", "-o", "{hash}.torrent", magnet],
+        standalone_mode=False,
+    )
+    assert r.exit_code == 0, show_result(r)
+    p = Path(f"{infohash}.torrent")
+    assert p.exists()
+    t = Torrent.read(p)
+    assert t.infohash == infohash
+    assert t.created_by is not None
+    assert t.created_by.startswith("demagnetize ")
+    assert [tr for tier in t.trackers for tr in tier] == trackers
