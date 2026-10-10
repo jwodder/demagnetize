@@ -1,6 +1,6 @@
 v0.4.0 (in development)
 -----------------------
-- Support Python 3.13 and 3.14
+- Support Python 3.13, 3.14, and 3.15
 
 v0.3.0 (2023-11-19)
 -------------------
